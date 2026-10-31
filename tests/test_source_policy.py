@@ -3,7 +3,8 @@ import copy
 import unittest
 
 from eg_shopping.engine import (DomainError, compare_prices, compare_catalog,
-                                suggest_purchases, list_offer_interests)
+                                suggest_purchases, list_offer_interests, evaluate_past_purchase)
+from eg_shopping.stockup import evaluate_early_purchase
 from eg_shopping.cli import dispatch
 from eg_shopping.source_policy import (
     POLICY, source_gate, PRICE_QUERY, PUBLISHED_OFFER
@@ -175,6 +176,56 @@ class RetailerAndRightsGates(unittest.TestCase):
                                      rights_grants=grant(retailer="PENNY"))[0])
         self.assertFalse(source_gate(dict(purchase, confirmed=False),
                                      usage_context="PRIVATE_USER_HISTORY")[0])
+
+    def test_historical_alternatives_respect_display_rights(self):
+        bought = obs("PURCHASED", price=200, kind="HISTORICAL_PAID")
+        bought["confirmed"] = True
+        bought["purchaseAt"] = NOW
+        old_alt = obs("OLD_ALT", price=100, kind="LISTED_REGULAR",
+                      rights="UNVERIFIED")
+        result = evaluate_past_purchase(
+            bought, [old_alt], accessible_stores={"REWE": ["SHOP1"]},
+            coverage={"complete": True}, usage_context="APP_DISPLAY",
+            rights_grants=grant(mode=PRICE_QUERY))
+        self.assertEqual(result["comparison"]["alternatives"], [])
+        self.assertIsNone(result["comparison"]["bestProvenMerchandiseSavingCents"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", result["comparison"]["signals"])
+        old_alt["source"]["rightsStatus"] = "PERMITTED"
+        result = evaluate_past_purchase(
+            bought, [old_alt], accessible_stores={"REWE": ["SHOP1"]},
+            coverage={"complete": True}, usage_context="APP_DISPLAY",
+            rights_grants=grant(mode=PRICE_QUERY))
+        self.assertEqual(result["comparison"]["bestProvenMerchandiseSavingCents"], 100)
+
+    def test_early_purchase_evidence_rights_are_independent(self):
+        need = {"foodTypeId": "oats", "dueDate": "2026-11-03",
+                "quantityToBuy": 500, "unit": "g", "basis": "NET"}
+        offer = obs("NOW", price=100)
+        future = obs("NEXT", price=130, kind="LISTED_REGULAR")
+        future["validFrom"] = "2026-11-03"
+        grants = grant()
+        grants["official-synthetic-rewe"]["acquisitionModes"] = [
+            PUBLISHED_OFFER, PRICE_QUERY]
+        common = {"shopping_date": DATE, "as_of": NOW,
+                  "budget": {"amountCents": 200, "periodStart": DATE,
+                             "periodEnd": DATE},
+                  "capacity": {"DRY": 1000},
+                  "shelf_life_days": 7, "storage_class": "DRY",
+                  "package_volume_ml": 500, "future_price": future,
+                  "usage_context": "APP_DISPLAY", "rights_grants": grants}
+        offer["source"]["rightsStatus"] = "UNVERIFIED"
+        blocked = evaluate_early_purchase(need, offer, **common)
+        self.assertIsNone(blocked["merchandiseCents"])
+        self.assertIsNone(blocked["savingsProvenCents"])
+        offer["source"]["rightsStatus"] = "PERMITTED"
+        future["source"]["rightsStatus"] = "UNVERIFIED"
+        blocked = evaluate_early_purchase(need, offer, **common)
+        self.assertIsNone(blocked["futureComparableCents"])
+        self.assertIsNone(blocked["savingsProvenCents"])
+        future["source"]["rightsStatus"] = "PERMITTED"
+        valid = evaluate_early_purchase(need, offer, **common)
+        self.assertEqual(valid["status"], "ADVANCE_FEASIBLE_NOT_PURCHASED")
+        self.assertEqual(valid["savingsProvenCents"], 30)
 
     def test_cli_refuses_caller_forged_grants(self):
         with self.assertRaises(DomainError):
