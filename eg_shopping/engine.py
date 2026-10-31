@@ -360,6 +360,7 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
     for lots in lots_by_type.values():
         lots.sort(key=lambda x: (x["until"], x["id"]))
     tasks, used_ids, plan_days = [], set(), set()
+    unknown_demands = []
     if snapshot.get("demands") is None:
         warnings.append("plan snapshot UNKNOWN")
     for row in snapshot.get("demands") or []:
@@ -376,6 +377,9 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
         qty = _need_qty(row)
         if qty is None or not row.get("foodTypeId"):
             warnings.append(f"demand {eid}: amount/type UNKNOWN")
+            unknown_demands.append({"eventId": eid, "foodTypeId": row.get("foodTypeId"),
+                                    "dueDate": row.get("dueDate"), "quantityToBuy": None,
+                                    "reason": "confirmed comparable amount/type UNKNOWN"})
             continue
         due = _day(row["dueDate"])
         if as_of <= due < as_of + timedelta(days=max_h):
@@ -400,7 +404,9 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
                 if d < h_start or d > h_end:
                     raise DomainError("consumption event outside observation window")
                 qty = _need_qty(e)
-                if qty and e.get("confirmed") is True and e.get("foodTypeId"):
+                if (qty and e.get("confirmed") is True and e.get("foodTypeId") and
+                    e.get("kind") not in ("PORTION_CONSUMPTION",
+                                          "COOKED_MEAL_CONSUMPTION")):
                     key = (e["foodTypeId"], qty[1], qty[2])
                     aggregates[key] += qty[0]
                     counts[key] += 1
@@ -446,6 +452,7 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
                                      "quantityToBuy": v}
                                     for k, v in sorted(totals.items())]}
     return {"asOf": snapshot["asOf"], "horizons": views, "allocations": needs,
+            "unknownNeeds": sorted(unknown_demands, key=lambda x: x["eventId"]),
             "warnings": sorted(set(warnings)), "snapshotComplete": not warnings,
             "sideEffects": []}
 
