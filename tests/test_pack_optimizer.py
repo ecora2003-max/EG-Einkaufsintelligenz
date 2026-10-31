@@ -255,6 +255,11 @@ class MixedPackaging(unittest.TestCase):
         self.assertEqual(r["items"][0]["status"], "REVIEW")
         self.assertIn("organic status differs from price observation",
                       r["items"][0]["reasons"])
+        self.assertFalse(r["items"][0]["priceEvidenceVerified"])
+        self.assertIsNone(r["totalCostCents"])
+        self.assertIsNone(r["totalCheckoutCents"])
+        self.assertIsNone(r["budgetRemainingCents"])
+        self.assertEqual(r["items"][0]["estimatedCheckoutCents"], 100)
 
     def test_product_coupon_not_overridden_by_regular_source(self):
         view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
@@ -273,6 +278,10 @@ class MixedPackaging(unittest.TestCase):
         self.assertEqual(r["items"][0]["status"], "REVIEW")
         self.assertIn("candidate coupon or membership condition unverified",
                       r["items"][0]["reasons"])
+        self.assertIsNone(r["totalCostCents"])
+        self.assertIsNone(r["totalCheckoutCents"])
+        self.assertIsNone(r["budgetRemainingCents"])
+        self.assertEqual(r["items"][0]["estimatedCheckoutCents"], 80)
 
     def test_duplicate_product_ids_rejected(self):
         from eg_shopping import DomainError
