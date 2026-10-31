@@ -105,12 +105,14 @@ def need_projection_envelope(projection: dict, *, horizon_days: int,
             raise DomainError("duplicate known and unknown need")
         due_str = unknown.get("dueDate")
         food = unknown.get("foodTypeId")
-        if not due_str or not food:
-            warnings.append(f"unknown demand {eid}: due date or foodTypeId missing")
+        if not food:
+            warnings.append(f"unknown demand {eid}: foodTypeId missing")
             continue
-        due = _day(due_str)
-        if not origin_day <= due < bound:
-            continue
+        if due_str is not None:
+            due = _day(due_str)
+            if not origin_day <= due < bound:
+                continue
+        used_ids.add(eid)
         # Schema v1.1 requires a known unit even when quantity is null.
         # Preserve the exact unknown facts separately as a namespaced draft
         # extension; do not fabricate a unit or suppress the demand ID.
@@ -236,15 +238,15 @@ def past_comparison_envelope(report: dict, *, purchase_ref: str, purchase_at: st
     unit_only = _references([x["observationId"] for x in c.get("unitOnlyAlternatives", [])],
                             "unitOnlyAlternatives")
     warnings = sorted(set(c.get("gaps") or []))
-    if alternatives:
-        status = "PROVEN"
-    elif warnings:
-        status = "INCOMPLETE"
-    else:
-        status = "NO_COMPARABLE_OFFER"
     saving = c.get("bestProvenMerchandiseSavingCents") if alternatives else None
     if saving is not None and (type(saving) is not int or saving <= 0):
         raise DomainError("historical savings must be positive known integer")
+    if alternatives and saving is not None:
+        status = "PROVEN"
+    elif warnings or alternatives:
+        status = "INCOMPLETE"
+    else:
+        status = "NO_COMPARABLE_OFFER"
     payload = {"confirmedPurchaseRef": _identifier(purchase_ref, "confirmedPurchaseRef"),
                "purchaseAt": purchase_at, "evidenceCutoff": purchase_at,
                "storeScope": dict(store_scope),
