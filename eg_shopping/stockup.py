@@ -84,8 +84,13 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
             reasons.extend(["future price: " + note for note in future_notes])
             level, _ = _comparability(offer, future_price, [])
             q_future = _quantity(future_price.get("article", {}).get("quantity"))
-            if level not in ("EXACT_SKU", "SAME_FOOD_VARIANT") or q_future is None or \
-               q_future[1:] != q[1:]:
+            current_bio = offer["article"].get("organic")
+            future_bio = future_price["article"].get("organic")
+            if (current_bio is None or future_bio is None or
+                current_bio != future_bio):
+                reasons.append("future price organic status not like-for-like")
+            elif level not in ("EXACT_SKU", "SAME_FOOD_VARIANT") or q_future is None or \
+                 q_future[1:] != q[1:]:
                 reasons.append("future price product not proven comparable")
             elif future_price.get("depositCents") is None:
                 reasons.append("future checkout deposit UNKNOWN")
