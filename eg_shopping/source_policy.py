@@ -45,8 +45,19 @@ def source_gate(obs: dict, *, usage_context: str = "RESEARCH_ONLY",
             return False, "private history purchase timestamp invalid"
         return True, "private history only, never current store price"
     retailer = scope.get("retailerId")
-    mode = obs.get("acquisitionMode", src.get("acquisitionMode"))
+    # Price kind is not evidence of how the observation was acquired.  A
+    # targeted product query may itself return a SALE price.  Do not allow
+    # absent or conflicting provenance to turn that query into an offer feed.
+    observation_mode = obs.get("acquisitionMode")
+    source_mode = src.get("acquisitionMode")
+    if (observation_mode is not None and source_mode is not None
+            and observation_mode != source_mode):
+        return False, "conflicting observation/source acquisition modes"
+    mode = observation_mode if observation_mode is not None else source_mode
     if mode is None:
+        if usage_context == "APP_DISPLAY":
+            return False, "explicit acquisition mode provenance required for display"
+        # Legacy synthetic/research fixtures can still infer a test-only mode.
         mode = PUBLISHED_OFFER if obs.get("priceKind") == "SALE" else PRICE_QUERY
     if mode not in (PRICE_QUERY, PUBLISHED_OFFER):
         return False, "acquisition mode not recognized"
