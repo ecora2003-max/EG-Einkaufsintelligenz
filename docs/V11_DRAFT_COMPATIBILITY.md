@@ -26,15 +26,17 @@
 
 ## Nachweis / reproduzierbare Prüfung
 
-CI: [Offline acceptance, Run 41224632634](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224632634), PR-Merge-Checkout `004077f` gegen Fachcode-SHA `d59093b7e1eed61d39d88fa345aa74b10d91eb38`. Python 3.12, Befehl:
+CI: [Offline acceptance, Run 41224765046](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224765046), PR-Merge-Checkout `67084be` gegen Fachcode-SHA `f56ade91d2192d41cb21ac780d6f9937d6722702`. Python 3.12, Befehl:
 
 ```bash
 python -m pip install 'jsonschema[format]==4.23.0'
 python -m unittest discover -s tests -v
 ```
 
-Ergebnis: **106 bestanden / 0 fehlgeschlagen / 0 übersprungen**. In `tests/test_draft_v11.py` werden alle neun Architektur-Beispielnachrichten durch `Draft202012Validator` und den Formatchecker validiert sowie eigene positive und negative Adapter-Fälle geprüft. Die unveränderte `v1.0`-Validierung wird parallel fortgeführt. Diese CI belegt eine **experimentelle Formatkompatibilität**, keine Freigabe der neuen Vertragsversion oder Geräteintegration.
+Ergebnis: **107 bestanden / 0 fehlgeschlagen / 0 übersprungen**. In `tests/test_draft_v11.py` werden alle neun Architektur-Beispielnachrichten durch `Draft202012Validator` und den Formatchecker validiert sowie eigene positive und negative Adapter-Fälle geprüft. Die unveränderte `v1.0`-Validierung wird parallel fortgeführt. Diese CI belegt eine **experimentelle Formatkompatibilität**, keine Freigabe der neuen Vertragsversion oder Geräteintegration.
 
 **Wiederaufnahme:** Auf formale Freigabe durch Architektursteuerung und Entscheidung über unbekannte Einheiten/Mischgebinde warten. Erst nach Freigabe anbieterkompatiblen CLI-/Kotlin-Adapter erstellen und mit Codex auf der Haupt-App-Seite integrieren. Haupt-App, Architektur und andere Modulrepositorien wurden nicht verändert.
 
 **Hinweis:** Die erfolgreiche PR-Prüfung wurde unter https://github.com/ecora2003-max/EG-Einkaufsintelligenz/pull/4 ins eigene Repository integriert (Merge `63c7f22401cd7b7765f81b4b92b9938952f883cf`). Änderungen an der Haupt-App, Architektur oder anderen Zuliefererprojekten wurden nicht vorgenommen.
+
+**Zusätzlicher Negativtest:** Auch wenn ein Host intern `priceEvidenceVerified=true` behauptet, blockiert der Adapter die Ausgabe als nachgewiesene Kosten, wenn **eine** Zeile der gemischten Gebindeauswahl ohne `observationId` vorliegt. Test: `test_purchase_adapter_missing_one_mix_observation_cannot_prove_costs`; CI 41224765046, 107/107 grün. Die zusätzliche testauslösende PR #5 wurde ausschließlich im eigenen Repository gemergt (`da08f07122a4924f1437b0bb2a1a6e9c524762c7`).
