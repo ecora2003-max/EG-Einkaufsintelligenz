@@ -260,6 +260,14 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
         delta_int = int(price_delta) if price_delta.denominator == 1 else None
         milli = candidate_rate * 1000
         milli_int = (milli.numerator * 2 + milli.denominator) // (2 * milli.denominator)
+        deposit = candidate.get("depositCents")
+        if deposit is None:
+            gaps.append(f"{oid}: deposit/checkout cost UNKNOWN")
+        else:
+            _integer(deposit, "depositCents")
+        checkout_cents = (None if deposit is None else
+                          candidate["priceCents"] + deposit +
+                          (candidate.get("shippingCents") or 0))
         detail = {
             "observationId": oid, "pricePerBaseUnitMilliCents": milli_int,
             "basis": basis, "comparability": level, "bioDifference": bio_difference,
@@ -277,9 +285,7 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
             "validFrom": candidate.get("validFrom"), "validUntil": candidate.get("validUntil"),
             "observedAt": candidate["source"]["observedAt"],
             "priceKind": candidate["priceKind"],
-            "checkoutCents": candidate["priceCents"] +
-                  (candidate.get("depositCents") or 0) +
-                  (candidate.get("shippingCents") or 0),
+            "checkoutCents": checkout_cents,
             "depositCents": candidate.get("depositCents"),
             "shippingCents": candidate.get("shippingCents"),
             "exactUnitRateCents": {"numerator": candidate_rate.numerator,
