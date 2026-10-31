@@ -27,6 +27,7 @@ def obs(ref="A", retailer="REWE", price=100, *, kind="SALE",
         "scope": {"retailerId": retailer, "storeId": "SHOP1",
                   "scopeType": "STORE_CONFIRMED"},
         "priceCents": price, "currency": "EUR", "priceKind": kind,
+        "acquisitionMode": PUBLISHED_OFFER if kind == "SALE" else PRICE_QUERY,
         "validFrom": DATE, "validUntil": "2026-11-06",
         "depositCents": 0, "conditional": [],
         "availability": "IN_STOCK_REPORTED",
@@ -65,6 +66,54 @@ class RetailerAndRightsGates(unittest.TestCase):
                                      rights_grants=grant(retailer="NETTO_MD",
                                                          mode=PRICE_QUERY))[0])
         self.assertTrue(source_gate(obs(retailer="NETTO_MD"))[0])
+
+    def test_display_requires_acquisition_provenance_even_for_sale(self):
+        # A targeted query may return an advertised SALE; priceKind alone
+        # cannot prove that the data came from a published-offer feed.
+        sale = obs(retailer="PENNY")
+        sale.pop("acquisitionMode")
+        original = copy.deepcopy(sale)
+        penny_grant = grant(retailer="PENNY")
+        self.assertFalse(source_gate(sale, usage_context="APP_DISPLAY",
+                                     rights_grants=penny_grant)[0])
+        self.assertTrue(source_gate(sale, usage_context="RESEARCH_ONLY")[0])
+        self.assertEqual(sale, original)
+        sale["acquisitionMode"] = PRICE_QUERY
+        self.assertFalse(source_gate(sale, usage_context="APP_DISPLAY",
+                                     rights_grants=penny_grant)[0])
+        sale["acquisitionMode"] = PUBLISHED_OFFER
+        self.assertTrue(source_gate(sale, usage_context="APP_DISPLAY",
+                                    rights_grants=penny_grant)[0])
+
+    def test_conflicting_observation_and_source_mode_rejected(self):
+        sale = obs(retailer="PENNY")
+        sale["source"]["acquisitionMode"] = PRICE_QUERY
+        before = copy.deepcopy(sale)
+        for context in ("APP_DISPLAY", "RESEARCH_ONLY"):
+            with self.subTest(context=context):
+                self.assertFalse(source_gate(sale, usage_context=context,
+                                             rights_grants=grant(retailer="PENNY"))[0])
+        self.assertEqual(sale, before)
+
+    def test_unproven_sale_mode_does_not_leak_through_comparison(self):
+        target = obs("TARGET", retailer="REWE", price=200)
+        cheaper = obs("ALT", retailer="PENNY", price=100)
+        cheaper.pop("acquisitionMode")
+        cheaper["source"]["origin"] = "penny-synthetic"
+        rights = grant()
+        rights["penny-synthetic"] = {
+            "rightsEvidenceRef": "E1", "usageContext": "APP_DISPLAY",
+            "retailerId": "PENNY", "acquisitionModes": [PUBLISHED_OFFER],
+            "hostVerified": True}
+        originals = copy.deepcopy([target, cheaper, rights])
+        result = compare_prices(target, [cheaper], DATE, as_of=NOW,
+                                coverage={"complete": True},
+                                usage_context="APP_DISPLAY", rights_grants=rights)
+        self.assertEqual(result["alternatives"], [])
+        self.assertTrue(result["incomplete"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", result["signals"])
+        self.assertNotIn("100", str(result))
+        self.assertEqual([target, cheaper, rights], originals)
 
     def test_non_sale_cannot_disguise_targeted_query_as_published_offer(self):
         regular = obs(kind="LISTED_REGULAR", retailer="PENNY")
