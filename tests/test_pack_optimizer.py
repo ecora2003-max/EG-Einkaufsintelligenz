@@ -212,6 +212,68 @@ class MixedPackaging(unittest.TestCase):
         self.assertEqual(r["totalCheckoutCents"], 110)
         self.assertEqual(r["budgetRemainingCents"], 20)
 
+    def test_same_sku_multiple_retailers_remains_comparable(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                           "dueDate": DATE}]}
+        base = {"productId": "SAME_SKU", "foodTypeId": "oats",
+                "quantity": base_q(500), "shelfLifeDays": 30,
+                "storageClass": "DRY", "packageVolumeMl": 500}
+        rewe = with_evidence(dict(base, priceCents=120))
+        rewe["priceObservation"]["scope"].update(
+            retailerId="REWE", storeId="REWE-1")
+        lidl = with_evidence(dict(base, priceCents=90))
+        lidl["priceObservation"]["observationId"] = "LIDL-SKU-90"
+        lidl["priceObservation"]["scope"].update(
+            retailerId="LIDL", storeId="LIDL-1")
+        r = suggest_purchases(view, [rewe, lidl], shopping_date=DATE,
+            as_of="2026-10-31T15:00:00+01:00",
+            budget={"amountCents": 200, "periodStart": DATE, "periodEnd": DATE},
+            capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
+        self.assertEqual(r["items"][0]["productId"], "SAME_SKU")
+        self.assertEqual(r["items"][0]["mix"][0]["observationId"], "LIDL-SKU-90")
+        self.assertEqual(r["items"][0]["mix"][0]["retailerId"], "LIDL")
+        self.assertEqual(r["totalCheckoutCents"], 90)
+
+    def test_conflicting_bio_snapshot_never_certifies_purchase(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                           "dueDate": DATE}]}
+        p = with_evidence({"productId": "MISLABEL", "foodTypeId": "oats",
+                           "organic": True, "quantity": base_q(500),
+                           "priceCents": 100, "shelfLifeDays": 30,
+                           "storageClass": "DRY", "packageVolumeMl": 500})
+        # Source explicitly says non-organic.
+        self.assertIs(p["priceObservation"]["article"]["organic"], False)
+        r = suggest_purchases(view, [p], shopping_date=DATE,
+            as_of="2026-10-31T15:00:00+01:00",
+            budget={"amountCents": 200, "periodStart": DATE, "periodEnd": DATE},
+            capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["status"], "REVIEW")
+        self.assertIn("organic status differs from price observation",
+                      r["items"][0]["reasons"])
+
+    def test_product_coupon_not_overridden_by_regular_source(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                           "dueDate": DATE}]}
+        p = with_evidence({"productId": "APP", "foodTypeId": "oats",
+                           "quantity": base_q(500), "priceCents": 80,
+                           "conditional": ["requires loyalty app"],
+                           "shelfLifeDays": 30, "storageClass": "DRY",
+                           "packageVolumeMl": 500})
+        r = suggest_purchases(view, [p], shopping_date=DATE,
+            as_of="2026-10-31T15:00:00+01:00",
+            budget={"amountCents": 200, "periodStart": DATE, "periodEnd": DATE},
+            capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["status"], "REVIEW")
+        self.assertIn("candidate coupon or membership condition unverified",
+                      r["items"][0]["reasons"])
+
     def test_duplicate_product_ids_rejected(self):
         from eg_shopping import DomainError
         view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
