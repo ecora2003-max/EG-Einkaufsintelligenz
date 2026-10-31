@@ -28,7 +28,7 @@ def dispatch(message: dict) -> dict | list:
     if op == "suggestPurchases":
         return suggest_purchases(message["needsView"], message["products"],
                    shopping_date=message["shoppingDate"], budget=message.get("budget"),
-                   capacity=message.get("capacity"))
+                   capacity=message.get("capacity"), as_of=message.get("asOf"))
     if op == "evaluatePastPurchase":
         return evaluate_past_purchase(message["purchase"], message["historicalPrices"],
                    accessible_stores=message["accessibleStores"],
