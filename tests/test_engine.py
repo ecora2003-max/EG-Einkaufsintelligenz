@@ -264,6 +264,42 @@ class Comparisons(unittest.TestCase):
         self.assertEqual(out["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
         self.assertIn("insufficient confirmed storage volume", out["items"][1]["reasons"])
 
+    def test_regular_price_uses_store_local_date_not_utc(self):
+        target = observation("DAY_T", 199, start="2026-11-01",
+                             until="2026-11-06")
+        alt = observation("UTC_REG", 100, kind="LISTED_REGULAR",
+                          at="2026-10-31T23:30:00+00:00",
+                          start=None, until=None)
+        result = compare_prices(target, [alt], "2026-11-01",
+            as_of="2026-11-01T02:00:00+01:00", coverage={"complete": True})
+        self.assertEqual(result["signals"], ["RED_SAME_BIO_CHEAPER"])
+
+    def test_chain_scope_requires_grey_not_falsely_local_confidence(self):
+        chain = observation("CHAIN", 100, retailer="REWE",
+                            scope="CHAIN_WIDE_REPORTED")
+        r = compare(self.target, chain, coverage={"complete": True})
+        self.assertEqual(r["signals"], ["RED_SAME_BIO_CHEAPER",
+                                         "GREY_MAY_BE_CHEAPER"])
+        self.assertIn("not a confirmed local shelf price",
+                      " ".join(r["gaps"]))
+        unknown = observation("UNLOCATED", 50, scope="UNKNOWN")
+        r = compare(self.target, unknown, coverage={"complete": True})
+        self.assertEqual(r["alternatives"], [])
+        self.assertEqual(r["signals"], ["GREY_MAY_BE_CHEAPER"])
+
+    def test_observation_after_cutoff_is_unresolved_gap(self):
+        alt = observation("FUTURE_OBS", 20,
+                          at="2026-11-01T12:00:00+01:00")
+        result = compare(self.target, alt, coverage={"complete": True})
+        self.assertEqual(result["signals"], ["GREY_MAY_BE_CHEAPER"])
+        self.assertIn("after decision time", " ".join(result["gaps"]))
+
+    def test_duplicate_target_snapshot_id_fails_closed(self):
+        duplicate = observation("BASE", 199)
+        with self.assertRaises(DomainError):
+            compare_prices(self.target, [duplicate, duplicate], DATE,
+                           as_of=NOW, coverage={"complete": True})
+
     def test_schema_contract(self):
         try:
             import jsonschema
