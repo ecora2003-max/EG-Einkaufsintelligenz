@@ -214,7 +214,13 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
         raise DomainError("target and observations required")
     if not target.get("observationId"):
         raise DomainError("target.observationId required")
-    if not historical:
+    if historical and usage_context in ("APP_DISPLAY", "PRIVATE_USER_HISTORY"):
+        # The low-level comparison port must not bypass the receipt gate when
+        # called directly instead of through evaluate_past_purchase.
+        eligible, why = source_gate(target, usage_context="PRIVATE_USER_HISTORY")
+        if not eligible:
+            raise DomainError("historical target requires confirmed receipt: " + why)
+    elif not historical:
         eligible, why = source_gate(target, usage_context=usage_context,
                                     rights_grants=rights_grants)
         if not eligible:

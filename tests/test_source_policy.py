@@ -343,6 +343,23 @@ class RetailerAndRightsGates(unittest.TestCase):
         self.assertEqual(
             accepted["comparison"]["bestProvenMerchandiseSavingCents"], 100)
 
+    def test_low_level_historical_compare_cannot_bypass_receipt_gate(self):
+        purchased = obs("BOUGHT", price=200, kind="HISTORICAL_PAID")
+        purchased["purchaseAt"] = NOW
+        purchased["confirmed"] = True
+        alternate = obs("ALTERNATIVE", price=100, kind="LISTED_REGULAR")
+        before = copy.deepcopy([purchased, alternate])
+        kwargs = {"as_of": NOW, "historical": True,
+                  "coverage": {"complete": True},
+                  "usage_context": "APP_DISPLAY",
+                  "rights_grants": grant(mode=PRICE_QUERY)}
+        with self.assertRaisesRegex(DomainError, "confirmed receipt"):
+            compare_prices(purchased, [alternate], DATE, **kwargs)
+        purchased["source"]["evidenceKind"] = "USER_CONFIRMED_RECEIPT"
+        accepted = compare_prices(purchased, [alternate], DATE, **kwargs)
+        self.assertEqual(accepted["alternatives"][0]["priceCents"], 100)
+        self.assertEqual(alternate, before[1])
+
     def test_unknown_usage_context_is_rejected(self):
         with self.assertRaises(DomainError):
             source_gate(obs(), usage_context="NOT_A_CONTEXT")
