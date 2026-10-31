@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .engine import DomainError
+from .engine import DomainError, _instant
 
 POLICY = json.loads((Path(__file__).resolve().parents[1] /
                      "policies/retailer-source-capabilities.v1.json").read_text())
@@ -36,8 +36,13 @@ def source_gate(obs: dict, *, usage_context: str = "RESEARCH_ONLY",
     if usage_context == "PRIVATE_USER_HISTORY":
         if (obs.get("priceKind") != "HISTORICAL_PAID" or
             obs.get("confirmed") is not True or
-            src.get("evidenceKind") != "USER_CONFIRMED_RECEIPT"):
-            return False, "private history requires confirmed own historical receipt"
+            src.get("evidenceKind") != "USER_CONFIRMED_RECEIPT" or
+            not (scope.get("retailerId") and obs.get("purchaseAt"))):
+            return False, "private history requires confirmed dated own receipt and retailer"
+        try:
+            _instant(obs["purchaseAt"])
+        except (DomainError, TypeError, ValueError):
+            return False, "private history purchase timestamp invalid"
         return True, "private history only, never current store price"
     retailer = scope.get("retailerId")
     mode = obs.get("acquisitionMode", src.get("acquisitionMode"))
@@ -66,10 +71,12 @@ def source_gate(obs: dict, *, usage_context: str = "RESEARCH_ONLY",
     grant = (rights_grants or {}).get(origin) if isinstance(rights_grants, dict) else None
     if not origin or not evidence_ref or not isinstance(grant, dict):
         return False, "documented source-specific display permission missing"
+    modes = grant.get("acquisitionModes")
     if (grant.get("rightsEvidenceRef") != evidence_ref or
         grant.get("usageContext") != "APP_DISPLAY" or
         grant.get("retailerId") != retailer or
-        mode not in grant.get("acquisitionModes", ()) or
+        not isinstance(modes, (list, tuple)) or
+        mode not in modes or
         grant.get("hostVerified") is not True):
         return False, "rights grant does not match origin/retailer/purpose"
     return True, "APP_DISPLAY rights verified for source and use"
