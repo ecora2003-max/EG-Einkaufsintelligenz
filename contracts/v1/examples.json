@@ -1,0 +1,214 @@
+[
+  {
+    "contractVersion": "1.0.0-draft",
+    "messageType": "price.observation",
+    "meta": {
+      "producer": "synthetic-fixture",
+      "createdAt": "2026-10-31T15:00:00+01:00",
+      "traceId": "sample-price-01"
+    },
+    "payload": {
+      "observationId": "OBS-EXAMPLE-001",
+      "article": {
+        "label": "Haferflocken zart, 500 g",
+        "foodTypeId": "oats-fine",
+        "gtin": null,
+        "retailerArticleId": null,
+        "brandName": "Beispielmarke",
+        "brandKind": "PRIVATE_LABEL",
+        "organic": true,
+        "attributes": {
+          "form": "fine_oats"
+        },
+        "quantity": {
+          "amount": 500,
+          "unit": "g",
+          "basis": "NET",
+          "confirmed": true
+        }
+      },
+      "scope": {
+        "retailerId": "EXAMPLE_RETAILER",
+        "storeId": "EXAMPLE_STORE",
+        "scopeType": "STORE_CONFIRMED"
+      },
+      "priceCents": 199,
+      "currency": "EUR",
+      "priceKind": "SALE",
+      "validFrom": "2026-10-31",
+      "validUntil": "2026-11-06",
+      "depositCents": 0,
+      "conditional": [],
+      "source": {
+        "origin": "synthetic-fixture",
+        "url": null,
+        "observedAt": "2026-10-31T15:00:00+01:00",
+        "evidenceKind": "UNKNOWN",
+        "rightsStatus": "UNVERIFIED",
+        "dataQuality": "UNKNOWN"
+      },
+      "availability": "UNKNOWN"
+    }
+  },
+  {
+    "contractVersion": "1.0.0-draft",
+    "messageType": "product.match",
+    "meta": {
+      "producer": "synthetic-fixture",
+      "createdAt": "2026-10-31T15:00:00+01:00",
+      "traceId": "sample-match-01"
+    },
+    "payload": {
+      "requestId": "MATCH-EXAMPLE-01",
+      "candidate": {
+        "label": "Haferflocken zart, 500 g",
+        "foodTypeId": "oats-fine",
+        "gtin": null,
+        "retailerArticleId": null,
+        "brandName": "Beispielmarke",
+        "brandKind": "PRIVATE_LABEL",
+        "organic": true,
+        "attributes": {
+          "form": "fine_oats"
+        },
+        "quantity": {
+          "amount": 500,
+          "unit": "g",
+          "basis": "NET",
+          "confirmed": true
+        }
+      },
+      "matchLevel": "SAME_FOOD_VARIANT",
+      "status": "SUGGESTED",
+      "confidence": 0.76,
+      "evidence": [
+        "same food form and known 500 g quantity"
+      ],
+      "conflicts": [
+        "EAN unavailable; identity not confirmed"
+      ]
+    }
+  },
+  {
+    "contractVersion": "1.0.0-draft",
+    "messageType": "receipt.line",
+    "meta": {
+      "producer": "synthetic-fixture",
+      "createdAt": "2026-10-31T15:00:00+01:00",
+      "traceId": "sample-receipt-01"
+    },
+    "payload": {
+      "lineId": "LINE-EXAMPLE-01",
+      "receiptId": "RECEIPT-EXAMPLE-01",
+      "retailerId": "EXAMPLE_RETAILER",
+      "storeId": null,
+      "rawText": "HAFERFL ZART 0,89",
+      "lineKind": "FOOD",
+      "amountCents": 89,
+      "quantity": {
+        "amount": 500,
+        "unit": "g",
+        "basis": "NET",
+        "confirmed": false
+      },
+      "confirmed": false,
+      "purchaseAt": null,
+      "gtin": null,
+      "retailerArticleId": null,
+      "linkedArticle": null,
+      "source": null
+    }
+  },
+  {
+    "contractVersion": "1.0.0-draft",
+    "messageType": "comparison.result",
+    "meta": {
+      "producer": "synthetic-fixture",
+      "createdAt": "2026-10-31T15:00:00+01:00",
+      "traceId": "sample-comparison-01"
+    },
+    "payload": {
+      "comparisonId": "COMP-EXAMPLE-01",
+      "targetObservationId": "OBS-EXAMPLE-001",
+      "shoppingDate": "2026-10-31",
+      "alternatives": [
+        {
+          "observationId": "OBS-EXAMPLE-002",
+          "pricePerBaseUnitMilliCents": null,
+          "basis": "kg",
+          "comparability": "SAME_FOOD_VARIANT",
+          "bioDifference": "SAME",
+          "priceDifferenceCents": -20,
+          "evidence": [
+            "synthetic data; 500g pack at 179 cents"
+          ]
+        }
+      ],
+      "signals": [
+        "RED_SAME_BIO_CHEAPER",
+        "GREY_MAY_BE_CHEAPER"
+      ],
+      "incomplete": true,
+      "gaps": [
+        "other stores unverified",
+        "current price coverage incomplete"
+      ]
+    }
+  },
+  {
+    "contractVersion": "1.0.0-draft",
+    "messageType": "recipe.draft",
+    "meta": {
+      "producer": "synthetic-fixture",
+      "createdAt": "2026-10-31T15:00:00+01:00",
+      "traceId": "sample-recipe-01"
+    },
+    "payload": {
+      "draftId": "RECIPE-EXAMPLE-01",
+      "title": "Haferflocken mit Obst",
+      "portionCount": 2,
+      "ingredients": [
+        {
+          "label": "Haferflocken",
+          "foodTypeId": "oats-fine",
+          "productRef": null,
+          "quantity": {
+            "amount": 100,
+            "unit": "g",
+            "basis": "NET",
+            "confirmed": true
+          },
+          "sourceStatus": "SOURCED",
+          "allergenNotes": null
+        },
+        {
+          "label": "Obst",
+          "foodTypeId": null,
+          "productRef": null,
+          "quantity": {
+            "amount": null,
+            "unit": "g",
+            "basis": "UNKNOWN",
+            "confirmed": false
+          },
+          "sourceStatus": "UNKNOWN",
+          "allergenNotes": null
+        }
+      ],
+      "steps": [
+        "Zutaten prüfen und portionieren.",
+        "Zusammen zubereiten."
+      ],
+      "flags": {
+        "considerStock": false,
+        "considerShopping": false,
+        "considerOffers": false
+      },
+      "nutrition": null,
+      "warnings": [
+        "Obstmenge unbekannt; keine verlässliche Nährwertsumme"
+      ],
+      "status": "DRAFT"
+    }
+  }
+]
