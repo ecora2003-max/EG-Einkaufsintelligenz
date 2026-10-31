@@ -235,6 +235,7 @@ class RetailerAndRightsGates(unittest.TestCase):
         bought = obs("PURCHASED", price=200, kind="HISTORICAL_PAID")
         bought["confirmed"] = True
         bought["purchaseAt"] = NOW
+        bought["source"]["evidenceKind"] = "USER_CONFIRMED_RECEIPT"
         old_alt = obs("OLD_ALT", price=100, kind="LISTED_REGULAR",
                       rights="UNVERIFIED")
         result = evaluate_past_purchase(
