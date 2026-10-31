@@ -501,6 +501,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                      n["quantityToBuy"] > 0]
         last_due = max(due_dates).isoformat() if due_dates else None
         offers = []
+        verified_offers = []
         source_issues = {}
         product_by_id = {}
         missing_product_prices = False
@@ -516,6 +517,8 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 continue
             _integer(product["priceCents"], "priceCents")
             pid = product["productId"]
+            if not isinstance(pid, str) or not pid or pid in product_by_id:
+                raise DomainError("missing or duplicated productId in purchase candidates")
             product_by_id[pid] = product
             evidence = product.get("priceObservation")
             problems = []
@@ -538,21 +541,34 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                     problems.append("deposit differs from source observation")
             if product.get("minPacks", 1) > 1 and product.get("termsVerified") is not True:
                 problems.append("multibuy terms unverified")
+            deposit = product.get("depositCents")
+            if deposit is None:
+                problems.append("deposit/checkout cash UNKNOWN")
+            else:
+                _integer(deposit, "depositCents")
             source_issues[pid] = problems
-            offers.append({
-                "productId": pid, "amount": q[0], "priceCents": product["priceCents"],
+            # Optimization uses proven checkout cash (including refundable deposit)
+            # for both ranking and budget feasibility. Merchandise cost is
+            # independently reconstructed below from original products.
+            cash_per_pack = product["priceCents"] + (deposit or 0)
+            candidate = {
+                "productId": pid, "amount": q[0], "priceCents": cash_per_pack,
                 "minPacks": product.get("minPacks", 1),
                 "maxPacks": product.get("maxPacks"),
                 "shelfLifeDays": product.get("shelfLifeDays"),
                 "storageClass": product.get("storageClass"),
                 "packageVolumeMl": product.get("packageVolumeMl"),
-                "priceKind": product.get("priceKind"),
-                "validFrom": product.get("validFrom"),
-                "validUntil": product.get("validUntil"),
-                "availability": product.get("availability"),
-                "conditional": product.get("conditional") or [],
+                "priceKind": evidence.get("priceKind") if isinstance(evidence, dict) else product.get("priceKind"),
+                "validFrom": evidence.get("validFrom") if isinstance(evidence, dict) else product.get("validFrom"),
+                "validUntil": evidence.get("validUntil") if isinstance(evidence, dict) else product.get("validUntil"),
+                "availability": evidence.get("availability") if isinstance(evidence, dict) else product.get("availability"),
+                "conditional": ((evidence.get("conditional") or []) if isinstance(evidence, dict)
+                                else (product.get("conditional") or [])),
                 "shippingCents": product.get("shippingCents"),
-            })
+            }
+            offers.append(candidate)
+            if not problems:
+                verified_offers.append(candidate)
         if not offers:
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
                          "reason": "no comparable priced pack", "costCents": None,
@@ -561,9 +577,9 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             checkout_complete = False
             continue
         try:
-            plan = optimize_package_mix(amount, offers, shopping_date=shopping_date,
-                          last_due_date=last_due, budget_cents=funds,
-                          capacity_ml=free_capacity)
+            plan = optimize_package_mix(amount, verified_offers or offers,
+                          shopping_date=shopping_date, last_due_date=last_due,
+                          budget_cents=funds, capacity_ml=free_capacity)
         except PackSearchError as ex:
             raise DomainError(str(ex)) from ex
         if plan["costCents"] is None:
@@ -574,10 +590,13 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             issues.append("total cost UNKNOWN")
             checkout_complete = False
             continue
-        price = plan["costCents"]
+        price = sum(product_by_id[item["productId"]]["priceCents"] * item["packs"]
+                    for item in plan["items"])
         known_subtotal += price
         checkout = price
         reasons = list(plan["warnings"])
+        if len(verified_offers) != len(offers):
+            reasons.append("unverified or incomplete price sources excluded from reliable optimization")
         for item in plan["items"]:
             product = product_by_id[item["productId"]]
             reasons.extend(source_issues[item["productId"]])
@@ -585,10 +604,8 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             if deposit is None:
                 checkout = None
                 reasons.append("deposit/checkout cash UNKNOWN")
-            else:
-                _integer(deposit, "depositCents")
-                if checkout is not None:
-                    checkout += deposit * item["packs"]
+            elif checkout is not None:
+                checkout += deposit * item["packs"]
         if checkout is None:
             checkout_complete = False
             funds = None
