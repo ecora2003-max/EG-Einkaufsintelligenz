@@ -34,3 +34,11 @@ Neu verifiziert: `eg_shopping/stockup.py` für quellengebundene vorgezogene Käu
 Die neue Architekturversion `1.1.0-draft` wird nur über **expliziten Import** von `eg_shopping.draft_v11` testweise abgebildet; es erfolgt keine Änderung der bestehenden CLI und kein stiller Wechsel vom `1.0.0-draft`-Vertrag. Vier Shopping-Nachrichtentypen, die beiden unveränderten Architektur-Testkopien und Positiv-/Negativtests sind unter `docs/V11_DRAFT_COMPATIBILITY.md`, `contracts/v1.1/` und `tests/test_draft_v11.py` dokumentiert.
 
 **Neuster CI-Lauf:** [107/107 bestandene Tests](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224765046) für v1.0 und den optionalen v1.1-Draft gemeinsam. Die spätere Vertragsfreigabe und produktive Android-Integration sind davon ausdrücklich **nicht** umfasst.
+
+## Architekturabgleich ADR-014/016/017 – aktuelle Abnahme
+
+Die Quelle-/Rechte-/Händlerfunktionsprüfung für sichtbare externe Preise und Angebote ist in eg_shopping/source_policy.py implementiert. Gegen den aktuellen Schema-Entwurf werden experimentell typisierte unknownNeeds[], packageLines[] und belegte historische Warenpreisersparnisse ausgegeben. Der neue Vertrag 1.1.0-draft bleibt **opt-in, nicht produktiv freigegeben**; die CLI bleibt bei 1.0.0-draft und sperrt ungeprüfte APP_DISPLAY-Rechteanfragen.
+
+**Aktuell verifizierte Tests: 127/127 erfolgreich**, keine Fehler, auf [GitHub Actions 41228078142](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41228078142). Dokumentation: docs/ACCEPTANCE_REPORT.md, docs/V11_DRAFT_COMPATIBILITY.md und docs/INTEGRATION.md.
+
+Der deterministische Offline-Fachkern ist weiterhin READY_FOR_INTEGRATION. Weder externe Live-Händlerquellen noch die Android-Haupt-App sind damit als integriert oder lizenzrechtlich freigegeben anzusehen.
