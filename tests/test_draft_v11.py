@@ -85,6 +85,9 @@ class DraftInterchange(unittest.TestCase):
         self.assertEqual(out["payload"]["needs"], [])
         self.assertEqual(out["payload"]["completeness"], "PARTIAL")
         self.assertIn("UNKNOWN1", " ".join(out["payload"]["warnings"]))
+        self.assertEqual(out["payload"]["unknownNeeds"][0]["needId"], "UNKNOWN1")
+        self.assertIsNone(out["payload"]["unknownNeeds"][0]["quantityToBuy"])
+        self.assertNotIn("unit", out["payload"]["unknownNeeds"][0])
         self.assertNotIn('"amount": 0', json.dumps(out))
 
     def test_need_projection_rejects_unprovable_time_or_refs(self):
