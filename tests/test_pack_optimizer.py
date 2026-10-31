@@ -162,6 +162,67 @@ class MixedPackaging(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertEqual(arr, old)
 
+    def test_verified_offer_selected_over_invalid_cheaper_source(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                           "dueDate": DATE}]}
+        cheap = with_evidence({"productId": "CHEAP", "foodTypeId": "oats",
+                               "quantity": base_q(500), "priceCents": 80,
+                               "shelfLifeDays": 30, "storageClass": "DRY",
+                               "packageVolumeMl": 500})
+        cheap["priceObservation"]["validUntil"] = "2026-10-01"
+        # A fully valid, more expensive offer is a better evidence-based choice.
+        good = with_evidence({"productId": "GOOD", "foodTypeId": "oats",
+                              "quantity": base_q(500), "priceCents": 120,
+                              "shelfLifeDays": 30, "storageClass": "DRY",
+                              "packageVolumeMl": 500})
+        r = suggest_purchases(view, [cheap, good], shopping_date=DATE,
+            as_of="2026-10-31T15:00:00+01:00",
+            budget={"amountCents": 200, "periodStart": DATE, "periodEnd": DATE},
+            capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["mix"][0]["productId"], "GOOD")
+        self.assertEqual(r["totalCheckoutCents"], 120)
+        self.assertEqual(r["knownSubtotalCents"], 120)
+        self.assertEqual(r["items"][0]["status"], "REVIEW")  # incomplete sources
+
+    def test_budget_optimizes_cash_including_refundable_deposit(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                           "dueDate": DATE}]}
+        cheap = with_evidence({"productId": "CHEAP", "foodTypeId": "oats",
+                               "quantity": base_q(500), "priceCents": 80,
+                               "shelfLifeDays": 30, "storageClass": "DRY",
+                               "packageVolumeMl": 500})
+        cheap["depositCents"] = 150
+        cheap["priceObservation"]["depositCents"] = 150
+        good = with_evidence({"productId": "GOOD", "foodTypeId": "oats",
+                              "quantity": base_q(500), "priceCents": 110,
+                              "shelfLifeDays": 30, "storageClass": "DRY",
+                              "packageVolumeMl": 500})
+        r = suggest_purchases(view, [cheap, good], shopping_date=DATE,
+            as_of="2026-10-31T15:00:00+01:00",
+            budget={"amountCents": 130, "periodStart": DATE, "periodEnd": DATE},
+            capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["mix"][0]["productId"], "GOOD")
+        self.assertEqual(r["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
+        self.assertEqual(r["totalCostCents"], 110)
+        self.assertEqual(r["totalCheckoutCents"], 110)
+        self.assertEqual(r["budgetRemainingCents"], 20)
+
+    def test_duplicate_product_ids_rejected(self):
+        from eg_shopping import DomainError
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}], "needs": []}
+        p = with_evidence({"productId": "REUSED", "foodTypeId": "oats",
+                           "quantity": base_q(500), "priceCents": 100,
+                           "shelfLifeDays": 30, "storageClass": "DRY",
+                           "packageVolumeMl": 500})
+        with self.assertRaises(DomainError):
+            suggest_purchases(view, [p, copy.deepcopy(p)],
+                shopping_date=DATE, as_of="2026-10-31T15:00:00+01:00")
+
     def test_missing_source_and_deposit_never_claims_cash_budget(self):
         view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
                             "unit": "g", "basis": "NET"}],
