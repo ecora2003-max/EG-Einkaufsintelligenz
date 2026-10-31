@@ -1075,6 +1075,13 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "unknownNeeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ShoppingUnknownNeed"
+          },
+          "description": "Needs with unknown amount/unit preserved outside typed Quantity; require PARTIAL or UNKNOWN overall completeness."
         }
       },
       "additionalProperties": true
@@ -1214,6 +1221,14 @@
             "ONLINE",
             "UNKNOWN"
           ]
+        },
+        "packageLines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ShoppingPackageLine"
+          },
+          "description": "Typed multi-SKU selection; totals and each row must be backed by original observation, price, deposit and store evidence."
         }
       },
       "additionalProperties": true
@@ -1311,7 +1326,8 @@
         "matchedHistoricalOfferIds",
         "rejectedReasons",
         "savingsProvenCents",
-        "warnings"
+        "warnings",
+        "savingsBasis"
       ],
       "properties": {
         "confirmedPurchaseRef": {
@@ -1368,9 +1384,120 @@
             "INCOMPLETE",
             "NO_COMPARABLE_OFFER"
           ]
+        },
+        "savingsBasis": {
+          "const": "MERCHANDISE_ONLY",
+          "description": "savingsProvenCents means proven merchandise outlay reduction, not checkout cash or unit-only price change."
         }
       },
       "additionalProperties": true
+    },
+    "ShoppingUnknownNeed": {
+      "type": "object",
+      "description": "Unresolved need whose unit must not be invented; not a fulfilled or zero-amount need.",
+      "required": [
+        "needId",
+        "foodTypeId",
+        "dueDate",
+        "quantityToBuy",
+        "reason"
+      ],
+      "properties": {
+        "needId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "foodTypeId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dueDate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "quantityToBuy": {
+          "type": "null"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ShoppingPackageLine": {
+      "type": "object",
+      "description": "One selected package line, with its own product, original price evidence and checkout components. Unknown is null.",
+      "required": [
+        "productId",
+        "observationId",
+        "packageCount",
+        "quantity",
+        "merchandiseCents",
+        "depositCents",
+        "checkoutCents",
+        "retailerId",
+        "storeId"
+      ],
+      "properties": {
+        "productId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observationId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "packageCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "quantity": {
+          "$ref": "#/$defs/Quantity"
+        },
+        "merchandiseCents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "depositCents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checkoutCents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "retailerId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "storeId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

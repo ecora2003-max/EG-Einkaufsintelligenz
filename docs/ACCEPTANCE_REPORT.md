@@ -43,3 +43,27 @@ Die Engine arbeitet offline auf standardisierten Daten-Snapshots. **Keine** API-
 CI-Run [41222176171](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222176171) schlug zunächst mit **85 Tests, 2 Fehlern** fehl (ein bewusst widersprüchliches Datumsintervall und fehlende Rückgabe präziser Ablehnungsgründe). Nach Korrektur und ergänzender Prüfung: [41222463623](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222463623) **89/89 grün**; anschließend [41222789227](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222789227) **92/92 grün**. Neue Regressionstests belegen: lokale Kalendertage Europe/Berlin, Rot plus Grau bei nur kettenweiter statt bestätigter Filialgültigkeit, Unbekannt-Scope und nach Entscheidungszeitpunkt beobachtete Preise, doppelte Beobachtungs-IDs, Auswahl belegter Preise vor fraglichen Quoten, Checkout-Budget inkl. Pfand, Varianten-/Bio-Konflikte, unbestätigte Coupons und mehrere Händlerangebote für **dieselbe** Produktidentität.
 
 **Kernbegrenzung:** Selbst vollständig grüne synthetische Tests bescheinigen keine Supermarkt-API-Vollständigkeit, rechtliche Quellenfreigabe, Echtzeitverfügbarkeit oder Android-Integration. Die Abnahme gilt nur für die offline ausführbare Referenzlogik.
+
+
+## Zusatzmatrix ADR-014/016 – unabhängig neu geprüft, 31.10.2026
+
+**Quelle:** Architektur-Head `f1984378d81f4d49ca93e5da195ecbc4d7260f80` (ADR-017 neu, v1.1 weiterhin Draft), `docs/PRICE_RIGHTS_AND_DISPLAY.md`, `docs/RETAILER_SOURCE_POLICY.md`, `policies/retailer-source-capabilities.v1.json` v1.0.1. Die unveränderte Händler-Policy ist in `eg_shopping/source_policy.py` offline umgesetzt. Diese Ergänzung erweitert die bestehenden 18 Pflichtfälle, ersetzt sie nicht.
+
+| Zusätzlicher Abnahmefall | Ausführbarer Nachweis in `tests/test_source_policy.py` |
+| --- | --- |
+| ALDI Nord/Süd, REWE, Lidl beide Operationen; übrige vier nur Angebote | `test_capability_matrix_eight_retailers` |
+| Forschungsmodus bleibt getrennt von Anzeige | `test_research_is_separate_from_display` |
+| Fremde UNVERIFIED/RESTRICTED und fehlende Anzeigeerlaubnis: kein Preis, kein Link, Grau | `test_unverified_restricted_and_missing_permission_never_visible` |
+| Reguläre Penny/Kaufland/EDEKA/Netto-Snapshots können nicht als Angebote umdeklariert werden | `test_restricted_retailer_regular_snapshot_not_relabelled` |
+| Erlaubte Operationen bei allen acht Händlern (mit synthetischen, expliziten Rechtebelegen) | `test_positive_regular_four_and_offers_eight` |
+| Unzulässiges Vergleichsziel/Katalog: kein Preisexport, Coverage unvollständig | `test_target_and_catalog_exclusion_no_price_leak` |
+| CLI-Opt-in, ungültiger Kontext und Rückwärtskompatibilität | `test_cli_opt_in_and_backward_compatibility` |
+| Interessenliste blendet unberechtigte Quellen aus und meldet Grau | `test_offer_interest_excludes_unlicensed_source` |
+| Einkaufsvorschlag kann keinen ausgefilterten Preis als bewiesene Kosten verwenden | `test_purchase_proposal_cannot_use_unverified_snapshot` |
+| Unbestätigter OCR-Entwurf, fehlende Bonidentität: keine Preis-/Bestandsbuchung | `test_ocr_draft_or_missing_identity_no_price_or_booking` |
+| Bestätigter eigener Bon nur datiert/historisch, deterministisch idempotent | `test_confirmed_local_receipt_dated_idempotent_and_not_current` |
+| Eigener Bon legalisiert keine fremden Preisalternativen | `test_private_receipt_cannot_legalize_external_price` |
+
+**Echte CI:** [Run 41227197394](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41227197394), Head `92a764fce3601fec5940cb6d04afdc1a47a72142`: **119 Pass, 0 Fail, 0 Skip**. Nach Aktualisierung der lokalen v1.1-Draft-Schema-/Beispielkopien auf die neuesten Architektur-Blobs (`dca777d219307a90bf3d4dff6189fbf12476c508`, `dc8eb8155564d2c595bf5b4b5676d0b92aeba0b9`) erneut [Run 41227315544](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41227315544), Head `9efa38924fb5929b56286eacdd3e57f5818f839f`: **119 Pass, 0 Fail, 0 Skip**. Kommandos: `python -m pip install 'jsonschema[format]==4.23.0'`; `python -m unittest discover -s tests -v` (Python 3.12, GitHub Actions Ubuntu). Nur synthetische Offline-Fälle.
+
+**Nicht durch diese Abnahme bewiesen:** echte Rechte-Registry/Signatur und Quelle-zu-Verwendungszweck-Freigabe, Live-Quellen, Android-UI-Zweitgate, dauerhafte Bon-Transaktionsdeduplizierung, v1.1-Stabilisierung und Codex-Integration. Der neue Nutzungsmodus ist **OFFLINE_VERIFIED**, nicht `SOURCE_VERIFIED` oder `INTEGRATED`.

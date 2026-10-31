@@ -12,7 +12,8 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
                             storage_class: str | None,
                             package_volume_ml: int | None,
                             future_price: dict | None = None,
-                            accessible_stores: dict | None = None) -> dict:
+                            accessible_stores: dict | None = None,
+                            usage_context: str = "RESEARCH_ONLY") -> dict:
     """A non-booking proposal. Only prove savings from a published future price.
 
     - Need: foodTypeId, dueDate, quantityToBuy, unit, basis.
@@ -32,7 +33,8 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
            "futureComparableCents": None, "savingsProvenCents": None,
            "sideEffects": []}
     reasons = out["reasons"]
-    valid, notes = _valid(offer, today, cutoff, allowed_stores=accessible_stores)
+    valid, notes = _valid(offer, today, cutoff, allowed_stores=accessible_stores,
+                          usage_context=usage_context)
     if not valid:
         reasons.extend(notes)
         return out
@@ -77,7 +79,8 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
         reasons.append("future comparable price UNKNOWN; saving not proven")
     else:
         ok, future_notes = _valid(future_price, due, cutoff,
-                                  allowed_stores=accessible_stores)
+                                  allowed_stores=accessible_stores,
+                                  usage_context=usage_context)
         if not ok:
             reasons.extend(["future price: " + note for note in future_notes])
         else:
