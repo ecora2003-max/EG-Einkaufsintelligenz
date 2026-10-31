@@ -155,6 +155,45 @@ class SourceScope(unittest.TestCase):
         self.assertNotIn("99", str(result))
 
 
+    def test_early_purchase_rejects_unlicensed_offer_and_future_quote(self):
+        need = {"foodTypeId": "oats-fine", "dueDate": "2026-11-02",
+                "quantityToBuy": 500, "unit": "g", "basis": "NET"}
+        offer = observation("S", 199, retailer="LIDL")
+        request = {"operation": "evaluateEarlyPurchase", "need": need,
+                   "offer": offer, "shoppingDate": DATE, "asOf": NOW,
+                   "usageContext": "APP_DISPLAY"}
+        blocked = dispatch(request)
+        self.assertEqual(blocked["status"], "REVIEW")
+        self.assertIsNone(blocked["merchandiseCents"])
+        self.assertIsNone(blocked["savingsProvenCents"])
+        request.update({
+            "offer": permitted(offer),
+            "futurePrice": observation("F", 250, retailer="REWE",
+                                       kind="LISTED_REGULAR",
+                                       start="2026-11-02", until="2026-11-02"),
+            "budget": {"amountCents": 1000, "periodStart": DATE,
+                       "periodEnd": "2026-11-07"},
+            "capacity": {"DRY": 10000}, "storageClass": "DRY",
+            "shelfLifeDays": 30, "packageVolumeMl": 500})
+        blocked_future = dispatch(request)
+        self.assertEqual(blocked_future["status"], "REVIEW")
+        self.assertIsNone(blocked_future["futureComparableCents"])
+        self.assertIsNone(blocked_future["savingsProvenCents"])
+
+    def test_mixed_catalog_excludes_unauthorized_target_and_alternative(self):
+        good = permitted(observation("GOOD", 199, retailer="LIDL"))
+        bad = observation("BAD", 50, retailer="PENNY")
+        result = compare_catalog([good, bad], DATE, as_of=NOW,
+                                 coverage={"complete": True},
+                                 usage_context="APP_DISPLAY")
+        self.assertEqual(len(result["comparisons"]), 1)
+        self.assertEqual(len(result["omittedTargets"]), 1)
+        self.assertEqual(result["comparisons"][0]["alternatives"], [])
+        self.assertEqual(result["signals"], ["GREY_MAY_BE_CHEAPER"])
+        self.assertTrue(result["incomplete"])
+        self.assertNotIn("50", str(result))
+
+
 class PrivateHistory(unittest.TestCase):
     def test_ocr_draft_or_missing_identity_no_price_or_booking(self):
         for changes in ({"confirmed": False}, {"receiptId": ""},
