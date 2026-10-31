@@ -51,6 +51,8 @@ def _quantity(q: dict | None) -> tuple[int, str, str] | None:
     if not isinstance(q, dict) or q.get("confirmed") is not True or q.get("amount") is None:
         return None
     amount = _integer(q["amount"], "quantity.amount", 1)
+    if q.get("packageCount", 1) is None:
+        return None
     count = _integer(q.get("packageCount", 1), "packageCount", 1)
     unit, basis = q.get("unit"), q.get("basis")
     if unit not in ("g", "ml", "piece") or basis == "UNKNOWN":
@@ -122,6 +124,8 @@ def _valid(obs: dict, shopping_date: date, as_of: datetime, historical: bool = F
         return False, ["source quality unverified"]
     if source.get("rightsStatus") == "RESTRICTED":
         return False, ["source rights restricted"]
+    if source.get("observedAt") is None:
+        return False, ["observation timestamp unknown"]
     observed = _instant(source.get("observedAt"))
     if observed > as_of:
         return False, ["observed after decision time"]
