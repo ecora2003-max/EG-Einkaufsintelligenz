@@ -70,3 +70,13 @@ Erforderliche minimal-normalisierte Produktdaten: `productId`, `foodTypeId`, `qu
 `evaluate_early_purchase` (`operation=evaluateEarlyPurchase`) erwartet einen zeitlich belegten Angebots- und einen bereits publizierten Zukunftspreis. Nur bei nachgewiesen gleicher Produktvariante, ausreichend Haltbarkeit, Lagerkapazitaet und Budget inklusive Pfand sowie positivem Preisvorteil resultiert `ADVANCE_FEASIBLE_NOT_PURCHASED`; sonst `REVIEW`, ohne Kauf- oder Lagerbuchung. `savingsProvenCents=null` bedeutet fehlende Preisbeweise.
 
 `list_offer_interests` akzeptiert `preferred_food_types`, `walking_distance_by_store_m` (Schluessel `retailerId/storeId`) und `max_walking_distance_m`. Die CLI-Felder heissen `preferredFoodTypes`, `walkingDistanceByStoreM`, `maxWalkingDistanceM`. Unbekannte Gehstrecken werden bei gesetztem Radius nicht geraten, sondern herausgefiltert.
+
+## Nachpruefung Preisbeweis und Filial-IDs (31.10.2026)
+
+Ein Produkt darf mehrere Preisbeobachtungen je Haendler/Filiale besitzen. `priceObservation.observationId` ist je Kandidat eindeutig; `productId` bleibt die gemeinsame Artikelidentitaet. In `mix[]` erscheinen `productId`, `observationId`, `retailerId`, `storeId`, Gebindemenge und Warenkosten. Ohne eindeutige Angebotsidentitaet wird nicht still ueberschrieben.
+
+Bei Einkaufsvorschlaegen prueft der Fachkern Quellzeitpunkt, Geltungsdatum, Preis, Mengengrundlage sowie explizit uebergebene Artikelmerkmale (Bio, GTIN, Variantenattribute), Quelle, Filialidentitaet, Konditionen und Preisart. Fehlen Belege oder widersprechen sich Daten, bleibt der Vorschlag REVIEW und die Checkout-Summe unbekannt. Auch ein im Produkt-Snapshot genannter App-Coupon darf nicht durch widersprechende Herkunftsdaten automatisch als erfuellt gelten.
+
+Die Optimierung verwendet bei bekannter Pfandangabe den benoetigten Cashbetrag pro Verkaufseinheit (Warenpreis plus Pfand) als Budgetrestriktion. Artikelkosten `costCents`/`knownSubtotalCents` sind getrennt von Checkoutkosten. `totalCostCents`, `totalCheckoutCents` und `budgetRemainingCents` werden null, sobald ausgewaehlte Preisquellen nicht belastbar sind. Bei unbestaetigter Quelle kann `estimatedCheckoutCents` eine gesonderte Modellzahl enthalten; sie ist keine nachgewiesene Ausgabe. Guthaben aus Pfandrueckgabe wird nicht vorweggenommen.
+
+Die Beobachtung regulärer Preise ohne vollstaendiges Datumsintervall wird fuer den Haendlerkalendertag in Europe/Berlin ausgewertet. Kettenweite und regionale Hinweise duerfen nur mit grauem Unsicherheitsvermerk erscheinen; `scopeType=UNKNOWN` ist keine bestaetigte lokale Filiale.
