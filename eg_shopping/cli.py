@@ -48,7 +48,10 @@ def dispatch(message: dict) -> dict | list:
     if op == "listOfferInterests":
         return list_offer_interests(message["observations"], message["state"],
                    message["shoppingDate"], as_of=message["asOf"],
-                   preferred_retailers=message.get("preferredRetailers"))
+                   preferred_retailers=message.get("preferredRetailers"),
+                   preferred_food_types=message.get("preferredFoodTypes"),
+                   walking_distance_by_store_m=message.get("walkingDistanceByStoreM"),
+                   max_walking_distance_m=message.get("maxWalkingDistanceM"))
     raise DomainError("unrecognized operation")
 
 
