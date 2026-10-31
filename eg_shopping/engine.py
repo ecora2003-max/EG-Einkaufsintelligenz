@@ -206,6 +206,11 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
     target_rate = _rate(target)
     if target_rate is None:
         raise DomainError("target price and confirmed comparable quantity required")
+    if not historical:
+        target_ok, target_reasons = _valid(target, day, cutoff)
+        if not target_ok:
+            raise DomainError("target is not a proven price for shopping date: " +
+                              "; ".join(target_reasons))
     alternative_rows, other_days, rejected = [], [], []
     used = {target["observationId"]}
     gaps = _coverage_gaps(coverage)
