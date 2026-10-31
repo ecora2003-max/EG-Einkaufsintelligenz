@@ -155,6 +155,24 @@ class DraftInterchange(unittest.TestCase):
         self.assertEqual(out["payload"]["observationRefs"], ["OA", "OB"])
         self.assertEqual(out["payload"]["mix"][0]["costCents"], 210)
 
+    def test_purchase_adapter_missing_one_mix_observation_cannot_prove_costs(self):
+        item = {"status": "FEASIBLE_NOT_PURCHASED", "priceEvidenceVerified": True,
+                "costCents": 330, "checkoutCents": 330, "quantityBought": 1500,
+                "mix": [
+                    {"productId": "A", "packs": 1, "quantityBought": 1000,
+                     "costCents": 210, "observationId": "OA"},
+                    {"productId": "B", "packs": 1, "quantityBought": 500,
+                     "costCents": 120}
+                ], "reasons": []}
+        out = check(purchase_suggestion_envelope(
+            item, need_ids=["N1"], unit="g", basis="NET", created_at=STAMP,
+            trace_id="missing-line-proof", suggestion_id="S3"))
+        self.assertEqual(out["payload"]["status"], "REVIEW")
+        self.assertEqual(out["payload"]["observationRefs"], ["OA"])
+        self.assertIsNone(out["payload"]["expectedCents"])
+        self.assertIsNone(out["payload"]["checkoutCents"])
+        self.assertIn("price observation not verified", out["payload"]["warnings"])
+
     def test_purchase_adapter_rejects_duplicate_need_ids(self):
         with self.assertRaises(DomainError):
             purchase_suggestion_envelope(
