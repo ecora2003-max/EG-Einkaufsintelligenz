@@ -22,7 +22,7 @@
 python -m pip install 'jsonschema[format]==4.23.0'
 python -m unittest discover -s tests -v
 ```
-**Ergebnis:** 59 Tests / **59 bestanden, 0 fehlgeschlagen, 0 übersprungen**, darunter formale Validierung der Architektur-Beispielnachrichten und `comparison.result`. Logs belegen dieses Ergebnis. Vorheriger CI-Lauf mit einem Testproblem (Formatvalidierung; nicht-failendes Invalidbeispiel) war **fehlgeschlagen** und wurde durch stärkere Negativprobe und Installation `jsonschema[format]` korrigiert. Weitere Commits nach diesem Lauf (Dokumentation) sind noch auf neuen CI-Status zu prüfen; der zuvor bestandene Testlauf belegt nicht jede spätere Codeänderung.
+**Ergebnis:** 62 Tests / **62 bestanden, 0 fehlgeschlagen, 0 übersprungen**, darunter formale Validierung der Architektur-Beispielnachrichten und `comparison.result`. Logs belegen dieses Ergebnis. Vorheriger CI-Lauf mit einem Testproblem (Formatvalidierung; nicht-failendes Invalidbeispiel) war **fehlgeschlagen** und wurde durch stärkere Negativprobe und Installation `jsonschema[format]` korrigiert. Weitere Commits nach diesem Lauf (Dokumentation) sind noch auf neuen CI-Status zu prüfen; der zuvor bestandene Testlauf belegt nicht jede spätere Codeänderung.
 
 ## Noch offene Punkte, keine unbelegte Vollständigkeitsmeldung
 
@@ -32,7 +32,7 @@ python -m unittest discover -s tests -v
 4. **Zeit- und Evidenzqualität:** Grunddaten sind konservativ, jedoch fehlen reichhaltige Nachweise zu Store-/Region- und Verfügbarkeitsdurchsetzung für manche Snapshot-Formen. `coverage.complete` ist nur übernommen und nicht gegen Prüfquellen deduktiv validiert. Bekannte große Marktabdeckung nie behauptet.
 5. **Haltbarkeit/Planung:** `usableUntil` und `shelfLifeDays` sind nur vom Host geprüfte Eingaben; kein MHD/Verbrauchsdatum-Validator und keine belegte Kühlkettenprüfung. Angebotspreis-Vorziehen und Aufteilung nach früherem Bedarf derzeit nicht fachlich optimiert.
 6. **Android:** Kein produktiver Kotlin-Port, keine Room-, Compose-, API- und Hardware-Integration; nur Integrationsskizze in `docs/INTEGRATION.md`.
-7. **Testabdeckung:** 59/59 synthetische Tests sind kein Nachweis der vollständigen Anforderungen. Offene Felder: globale Budgetoptimierung, Herkunftsvalidierung von Nachkaufpreisen, Coupons, rückgabefähiger Pfand-Cashflow, Kühlkette und Android-Port.
+7. **Testabdeckung:** 62/62 synthetische Tests sind kein Nachweis der vollständigen Anforderungen. Offene Felder: globale Budgetoptimierung, Herkunftsvalidierung von Nachkaufpreisen, Coupons, rückgabefähiger Pfand-Cashflow, Kühlkette und Android-Port.
 8. **Vertragserweiterung:** Separate ShoppingNeed-/OfferInterest-/HistoricalReport-DTOs sind **modulintern**, noch nicht in EG-Architecture abgestimmt. Änderungsvorschlag ist in `docs/CONTRACT_CHANGE_REQUEST.md` dokumentiert; Freigabe durch Architektursteuerung ausstehend.
 
 ## Konkreter Wiederaufnahmepfad
@@ -47,4 +47,7 @@ python -m unittest discover -s tests -v
 **Datenschutz und Lizenz:** Ausschließlich synthetische Testdaten. Kein Live-Scraping, keine Drittanbieter-Berechtigungen beansprucht; keine Nutzer-/Bon-Daten, kein Bezahl-API- oder Server-Zwang.
 
 ## Verifikation und Fortsetzung 31.10.2026
-CI-Run 41219610231 (54 Tests, 4 Fail/6 Error) und Run 41220076006 (59 Tests, 1 Fail) haben echte Defekte aufgedeckt. Sie wurden korrigiert. Run 41220132440 beweist 59/59 bestandene Tests auf dem aktuellen fachlichen Code. Fehlende Packungszahl und Quellenzeitpunkt erzeugen keine Nullannahmen; unbekannter Pfandbetrag bleibt `checkoutCents=null` und löst Grau aus. Offene Sicherheitsschranke: `suggest_purchases` benötigt strengere Nachweise für Preiszeitpunkt und Pfand-/Versandcashflow; keine globale Marktpreis- oder Einkaufsoptimalität behaupten. Folgeaufgabe: Herkunftsvalidierung und zusätzliche Negativtests, danach erneuter CI-Lauf.
+CI-Run 41219610231 (54 Tests, 4 Fail/6 Error) und Run 41220076006 (59 Tests, 1 Fail) haben echte Defekte aufgedeckt. Sie wurden korrigiert. Run 41220132440 beweist 62/62 bestandene Tests auf dem aktuellen fachlichen Code. Fehlende Packungszahl und Quellenzeitpunkt erzeugen keine Nullannahmen; unbekannter Pfandbetrag bleibt `checkoutCents=null` und löst Grau aus. Offene Sicherheitsschranke: `suggest_purchases` benötigt strengere Nachweise für Preiszeitpunkt und Pfand-/Versandcashflow; keine globale Marktpreis- oder Einkaufsoptimalität behaupten. Folgeaufgabe: Herkunftsvalidierung und zusätzliche Negativtests, danach erneuter CI-Lauf.
+
+## Verifikation 31.10.2026, zweiter Meilenstein
+Run: https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220579678 . Testbasis: main 69b1b3c537de9f804189d09c9005ac7c02ab8b31, PR-Merge 01a0287. Befehl: `python -m unittest discover -s tests -v`, nach Installation von `jsonschema[format]==4.23.0`. Ergebnis: 62 Pass, 0 Fail, 0 Skip. Seit diesem Test wurden nur Dokumente geändert. Neu: `suggest_purchases(..., as_of=...)` prüft Preisbelege (`priceObservation`) und lässt ohne passenden Beleg nur REVIEW zu. Pfand wird getrennt vom Warenpreis als Cash-Bedarf ausgewiesen, bei Unbekanntem bleibt Checkout null. Offene Risiken: globale Warenkorboptimierung, Gutschein-/Staffelkonditionen, Versand sowie Kotlin-Haupt-App-Integration. STATUS bleibt PARTIAL_READY.
