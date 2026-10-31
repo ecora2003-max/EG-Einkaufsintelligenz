@@ -830,7 +830,9 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
 
 
 def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
-                           accessible_stores: dict, coverage: dict | None = None) -> dict:
+                           accessible_stores: dict, coverage: dict | None = None,
+                           usage_context: str = "RESEARCH_ONLY",
+                           rights_grants: dict | None = None) -> dict:
     """Prove actual past purchase savings, not just cheaper unit prices.
 
     Buying one larger multipack may have a lower rate but a higher minimum
@@ -845,7 +847,8 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
         raise DomainError("purchase must carry HISTORICAL_PAID priceKind")
     result = compare_prices(purchase, historical_prices, when.date().isoformat(),
                             as_of=purchase["purchaseAt"], coverage=coverage,
-                            allowed_stores=accessible_stores, historical=True)
+                            allowed_stores=accessible_stores, historical=True,
+                            usage_context=usage_context, rights_grants=rights_grants)
     target_qty = _quantity(purchase.get("article", {}).get("quantity"))
     if target_qty is None:
         raise DomainError("confirmed historical purchase quantity required")
