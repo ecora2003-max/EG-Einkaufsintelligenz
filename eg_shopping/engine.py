@@ -700,9 +700,16 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
         for item in plan["items"]:
             p = product_by_id[item["productId"]]
             evidence = p.get("priceObservation")
+            merchandise = item["packs"] * p["priceCents"]
+            deposit = p.get("depositCents")
+            deposit_total = None if deposit is None else item["packs"] * _integer(
+                deposit, "depositCents")
             entry = {"productId": p["productId"], "packs": item["packs"],
                      "quantityBought": item["quantityBought"],
-                     "costCents": item["packs"] * p["priceCents"]}
+                     "costCents": merchandise,
+                     "depositCents": deposit_total,
+                     "checkoutCents": (merchandise + deposit_total
+                                      if deposit_total is not None else None)}
             if isinstance(evidence, dict):
                 entry["observationId"] = evidence.get("observationId")
                 entry["retailerId"] = (evidence.get("scope") or {}).get("retailerId")
