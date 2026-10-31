@@ -436,6 +436,27 @@ class InterestsAndHistory(unittest.TestCase):
                                         preferred_retailers=["REWE"])
         self.assertEqual(filtered[0]["bestKnownObservationId"], "X1")
 
+    def test_offer_foodtype_and_walking_distance_filters(self):
+        near = observation("NEAR", 120, retailer="REWE", store="R1")
+        far = observation("FAR", 90, retailer="LIDL", store="L1")
+        for x in (near, far):
+            x["article"]["gtin"] = "4000000000000"
+        all_rows = list_offer_interests([near, far], {}, DATE, as_of=NOW,
+            preferred_food_types=["oats-fine"],
+            walking_distance_by_store_m={"REWE/R1": 600, "LIDL/L1": 3000},
+            max_walking_distance_m=1000)
+        self.assertEqual(len(all_rows), 1)
+        self.assertEqual(all_rows[0]["bestKnownObservationId"], "NEAR")
+        none = list_offer_interests([near, far], {}, DATE, as_of=NOW,
+            preferred_food_types=["rice"])
+        self.assertEqual(none, [])
+        unknown = list_offer_interests([near, far], {}, DATE, as_of=NOW,
+            max_walking_distance_m=1000)
+        self.assertEqual(unknown, [])
+        with self.assertRaises(DomainError):
+            list_offer_interests([near], {}, DATE, as_of=NOW,
+                                 max_walking_distance_m=-1)
+
     def test_confirmed_past_purchase_no_future_hindsight(self):
         p = observation("PURCHASE", 199, kind="HISTORICAL_PAID",
                         at="2026-10-15T12:00:00+02:00", start=None, until=None)
