@@ -21,7 +21,7 @@ def observation(oid, cents, *, organic=True, food="oats-fine", q=None,
                 at=NOW, start=DATE, until="2026-11-06", quality="CONFIRMED",
                 brand_kind="PRIVATE_LABEL", brand_name="Home", attrs=None,
                 scope="STORE_CONFIRMED", availability="IN_STOCK_REPORTED",
-                conditional=None, shipping=None, deposit=None):
+                conditional=None, shipping=None, deposit=0):
     retailer = retailer or "MARKET_" + oid
     store = store or "STORE_" + oid
     data = {"observationId": oid,
@@ -158,6 +158,13 @@ class Comparisons(unittest.TestCase):
         regular = observation("ALDI", 175, kind="LISTED_REGULAR",
                               start=None, until=None, retailer="ALDI_NORD")
         self.assertEqual(compare(self.target, regular)["signals"][0], "RED_SAME_BIO_CHEAPER")
+
+    def test_unknown_deposit_is_not_silent_zero_checkout(self):
+        alt = observation("DEPOSIT_UNKNOWN", 50, deposit=None)
+        r = compare(self.target, alt, coverage={"complete": True})
+        self.assertIsNone(r["alternatives"][0]["checkoutCents"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", r["signals"])
+        self.assertTrue(any("deposit" in gap for gap in r["gaps"]))
 
     def test_online_shipping_and_coupon_and_deposit_separated(self):
         online = observation("ONLINE", 50, kind="ONLINE_LISTED", scope="ONLINE",
