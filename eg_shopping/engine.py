@@ -492,7 +492,9 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
 
 def suggest_purchases(needs_view: dict, products: list[dict], *,
                       shopping_date: str, budget: dict | None = None,
-                      capacity: dict | None = None, as_of: str | None = None) -> dict:
+                      capacity: dict | None = None, as_of: str | None = None,
+                      usage_context: str = "RESEARCH_ONLY",
+                      rights_grants: dict | None = None) -> dict:
     """Suggest mixed packs without turning missing price/deposit evidence into certainty.
 
     CostCents is merchandise only; checkout includes known per-pack deposit.
@@ -501,6 +503,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
     compare_prices, if the host supplies a matching priceObservation and as_of.
     """
     from .pack_optimizer import PackSearchError, optimize_package_mix
+    from .source_policy import source_gate
 
     today = _day(shopping_date)
     cutoff = _instant(as_of) if as_of is not None else None
@@ -550,6 +553,13 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 raise DomainError("duplicate price observation or ambiguous candidate identity")
             product_by_id[candidate_id] = product
             problems = []
+            if isinstance(evidence, dict):
+                gate_ok, gate_note = source_gate(evidence, usage_context=usage_context,
+                                                 rights_grants=rights_grants)
+                if not gate_ok:
+                    problems.append(gate_note)
+            elif usage_context == "APP_DISPLAY":
+                problems.append("source rights/retailer capability unknown")
             if cutoff is None or not isinstance(evidence, dict):
                 problems.append("price observation/asOf UNKNOWN")
             else:
@@ -756,13 +766,21 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
                          as_of: str, preferred_retailers: list[str] | None = None,
                          preferred_food_types: list[str] | None = None,
                          walking_distance_by_store_m: dict[str, int] | None = None,
-                         max_walking_distance_m: int | None = None) -> list[dict]:
+                         max_walking_distance_m: int | None = None,
+                         usage_context: str = "RESEARCH_ONLY",
+                         rights_grants: dict | None = None) -> list[dict]:
     """Deduplicate same product across retailers, retaining alternate retailer IDs."""
+    from .source_policy import source_gate
+
     day, cutoff = _day(shopping_date), _instant(as_of)
     if max_walking_distance_m is not None:
         _integer(max_walking_distance_m, "maxWalkingDistanceM")
     groups = defaultdict(list)
     for obs in observations:
+        gate_ok, _ = source_gate(obs, usage_context=usage_context,
+                                 rights_grants=rights_grants)
+        if not gate_ok:
+            continue
         a = obs.get("article", {})
         product = a.get("gtin") or a.get("productId")
         if not product or product in state.get("hiddenProducts", []):
