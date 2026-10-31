@@ -239,7 +239,7 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
             if reason == "not valid on shopping date" and candidate.get("priceKind") == "SALE":
                 other_days.append({"observationId": oid, "validFrom": candidate.get("validFrom"),
                                    "validUntil": candidate.get("validUntil")})
-            if "unknown" in reason or "incomplete" in reason or "unverified" in reason or "proof" in reason:
+            if any(token in reason for token in ("unknown", "incomplete", "unverified", "proof", "observed after decision time")):
                 gaps.append(f"{oid}: {reason}")
             continue
         gaps.extend(f"{oid}: {note}" for note in caveats)
