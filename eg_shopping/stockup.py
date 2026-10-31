@@ -12,7 +12,9 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
                             storage_class: str | None,
                             package_volume_ml: int | None,
                             future_price: dict | None = None,
-                            accessible_stores: dict | None = None) -> dict:
+                            accessible_stores: dict | None = None,
+                            usage_context: str = "RESEARCH_ONLY",
+                            rights_grants: dict | None = None) -> dict:
     """A non-booking proposal. Only prove savings from a published future price.
 
     - Need: foodTypeId, dueDate, quantityToBuy, unit, basis.
@@ -20,6 +22,8 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
     - Budget and capacity: confirmed cash budget for shopping day and known
       remaining storage volume; missing values are unknown, not zero.
     """
+    from .source_policy import source_gate
+
     today, cutoff, due = _day(shopping_date), _instant(as_of), _day(need["dueDate"])
     if due < today:
         raise DomainError("need due before shopping date")
@@ -32,6 +36,10 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
            "futureComparableCents": None, "savingsProvenCents": None,
            "sideEffects": []}
     reasons = out["reasons"]
+    ok, why = source_gate(offer, usage_context=usage_context, rights_grants=rights_grants)
+    if not ok:
+        reasons.append("offer source excluded: " + why)
+        return out
     valid, notes = _valid(offer, today, cutoff, allowed_stores=accessible_stores)
     if not valid:
         reasons.extend(notes)
@@ -76,6 +84,11 @@ def evaluate_early_purchase(need: dict, offer: dict, *,
     if future_price is None:
         reasons.append("future comparable price UNKNOWN; saving not proven")
     else:
+        allowed, why = source_gate(future_price, usage_context=usage_context,
+                                   rights_grants=rights_grants)
+        if not allowed:
+            reasons.append("future price source excluded: " + why)
+            return out
         ok, future_notes = _valid(future_price, due, cutoff,
                                   allowed_stores=accessible_stores)
         if not ok:
