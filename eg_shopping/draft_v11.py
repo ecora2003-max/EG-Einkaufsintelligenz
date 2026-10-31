@@ -75,6 +75,7 @@ def need_projection_envelope(projection: dict, *, horizon_days: int,
     warnings = list(projection.get("warnings") or [])
     refs = stock_refs_by_event or {}
     needs = []
+    unknown_rows = []
     used_ids = set()
     view = projection["horizons"][str(horizon_days)]
     for row in view.get("needs", []):
@@ -110,11 +111,15 @@ def need_projection_envelope(projection: dict, *, horizon_days: int,
         due = _day(due_str)
         if not origin_day <= due < bound:
             continue
-        # Schema v1.1 requires a known unit even when quantity is null. The
-        # source snapshot provides neither. Do not fabricate a unit: surface
-        # unresolved demand at envelope level until architecture can add
-        # nullable unit/basis or a separate unknown-needs collection.
-        warnings.append(f"unknown demand {eid}: quantity/unit unresolved; excluded from typed needs")
+        # Schema v1.1 requires a known unit even when quantity is null.
+        # Preserve the exact unknown facts separately as a namespaced draft
+        # extension; do not fabricate a unit or suppress the demand ID.
+        unknown_rows.append({
+            "needId": eid, "foodTypeId": food, "dueDate": due_str,
+            "quantityToBuy": None,
+            "reason": unknown.get("reason") or "quantity and unit unresolved"
+        })
+        warnings.append(f"unknown demand {eid}: quantity/unit unresolved; see unknownNeeds")
     needs.sort(key=lambda row: (row["dueDate"], row["needId"]))
     complete = projection.get("snapshotComplete") is True and not warnings
     payload = {"snapshotAt": snapshot_at, "asOf": as_of,
@@ -122,7 +127,8 @@ def need_projection_envelope(projection: dict, *, horizon_days: int,
                "horizonMode": "CUMULATIVE_FROM_SNAPSHOT", "needs": needs,
                "completeness": "COMPLETE" if complete else "PARTIAL",
                "warnings": sorted(set(warnings)),
-               "sourceSnapshotRefs": _references(source_snapshot_refs, "sourceSnapshotRefs", nonempty=True)}
+               "sourceSnapshotRefs": _references(source_snapshot_refs, "sourceSnapshotRefs", nonempty=True),
+               "unknownNeeds": unknown_rows}
     return _envelope("shopping.need.projection", payload, created_at=as_of,
                      trace_id=trace_id, snapshot_at=snapshot_at)
 
