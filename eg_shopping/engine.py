@@ -93,6 +93,8 @@ def _scope_ok(obs: dict, allowed_stores: dict | None, strict: bool) -> tuple[boo
         return False, ["unknown store/region scope"]
     if typ == "STORE_CONFIRMED" and not store:
         return False, ["missing confirmed store ID"]
+    if typ == "UNKNOWN":
+        return False, ["unknown local store scope"]
     if allowed_stores is not None:
         if retailer not in allowed_stores:
             return False, [f"retailer {retailer} not in accessible stores"]
