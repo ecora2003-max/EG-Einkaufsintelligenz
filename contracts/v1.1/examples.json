@@ -250,6 +250,15 @@
       ],
       "sourceSnapshotRefs": [
         "SNAP-FAKE-001"
+      ],
+      "unknownNeeds": [
+        {
+          "needId": "NEED-FAKE-UNKNOWN-002",
+          "foodTypeId": "fruit-unspecified",
+          "dueDate": "2026-11-05",
+          "quantityToBuy": null,
+          "reason": "Unit and quantity not confirmed"
+        }
       ]
     }
   },
@@ -293,7 +302,25 @@
         "synthetic only; no verified live market availability"
       ],
       "termsVerified": null,
-      "scopeType": "STORE_CONFIRMED"
+      "scopeType": "STORE_CONFIRMED",
+      "packageLines": [
+        {
+          "productId": "PRODUCT-FAKE-001",
+          "observationId": "OBS-EXAMPLE-001",
+          "packageCount": 1,
+          "quantity": {
+            "amount": 500,
+            "unit": "g",
+            "basis": "NET",
+            "confirmed": true
+          },
+          "merchandiseCents": 199,
+          "depositCents": 0,
+          "checkoutCents": 199,
+          "retailerId": "EXAMPLE_RETAILER",
+          "storeId": "EXAMPLE_STORE"
+        }
+      ]
     }
   },
   {
@@ -348,7 +375,8 @@
         "Historical price coverage insufficient"
       ],
       "unitOnlyAlternatives": [],
-      "status": "INCOMPLETE"
+      "status": "INCOMPLETE",
+      "savingsBasis": "MERCHANDISE_ONLY"
     }
   }
 ]
