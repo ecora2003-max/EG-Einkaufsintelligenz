@@ -21,6 +21,8 @@ python -m pip install 'jsonschema[format]==4.23.0'
 python -m unittest discover -s tests -v
 ```
 
-**CI-Stand 31.10.2026:** 74/74 bestandene Offline- und Vertrags-Tests (https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220994053). Das beweist keine Live-Datenabdeckung oder Android-Integration. Der gemeinsame Vertrag ist `1.0.0-draft`; produktiver Status **`PARTIAL_READY`**.
+**CI-Stand 31.10.2026:** 82/82 bestandene Offline- und Vertrags-Tests (https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221646056). Das beweist keine Live-Datenabdeckung oder Android-Integration. Der gemeinsame Vertrag ist `1.0.0-draft`; Status des **Offline-Referenzkerns: `READY_FOR_INTEGRATION`**; Android-Haupt-App und Live-Quellen sind ausdrücklich nicht integriert.
 
 Neu verifiziert: `eg_shopping/stockup.py` für quellengebundene vorgezogene Käufe. Angebotsinteressen erlauben FoodType- und durch Host belegte Laufwegfilter.
+
+**Abnahme und exakte Kotlin-Portierung:** [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md), [`docs/KOTLIN_MIGRATION_SPEC.md`](docs/KOTLIN_MIGRATION_SPEC.md), [`examples/EXPECTED_RESULTS.md`](examples/EXPECTED_RESULTS.md). Die dokumentierte Testbasis ist synthetisch und rein offline.
