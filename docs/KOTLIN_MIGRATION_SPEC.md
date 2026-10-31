@@ -18,3 +18,14 @@
 Die Referenz-CLI und synthetischen Fixtures unter `tests/`, `examples/` sind mathematische Orakel für parametrische Kotlin-JVM-Vertragstests. Die App muss Snapshot-Versionsprüfung, Offset-Konvertierung, Nutzerbestätigung, Transaktion und echte Lagerreservierung selbst bereitstellen. Nichts am Python-Kern ändert reale Room-Tabellen oder das produktive Google Sheet.
 
 **Nicht Teil dieser Lieferung:** ein eingebauter CPython-Interpreter auf Android, native Compose-UI, Händler-API-Adapter, Live-Händlerlizenz, App-Migrationen, Barcode-/Bon-OCR und Geräteprüfungen. Diese Vorgänge sind Verantwortungsbereich der jeweiligen Fachmodule bzw. von Codex; `INTEGRATED` erst nach dortiger realer Prüfung.
+
+## Portierungsnachtrag 31.10.2026: Quellrechte, Händlermatrix, Shopping-v1.1-Draft
+
+Vor jedem sichtbaren Vergleich auf Android:
+1. Funktions-Policy für die acht Händler aus policies/retailer-source-capabilities.v1.json verbindlich übernehmen; gezielte reguläre Produktpreisabfragen nur ALDI_NORD, ALDI_SUED, REWE, LIDL, veröffentlichte Aktionen für alle acht. Nie nur aufgrund eines technisch erreichbaren Endpoints freigeben. Händler-IDs inklusive NETTO_MD unverwechselt prüfen.
+2. APP_DISPLAY als privilegierte Host-Operation implementieren, mit authentifizierter Rechte-Registry. Die Quellbeobachtung muss rightsStatus=PERMITTED und dokumentierte rightsEvidenceRef besitzen; der Registry-Eintrag muss an Origin, konkreten Händler, Nutzungszweck, Erhebungsmodus und geprüften Geltungsbereich gebunden sein. Ein clientkontrolliertes JSON-Feld hostVerified=true ist keine sichere Authentifizierung; die Freigabe muss aus einer kontrollierten App-Grenze stammen. Host und Anzeige prüfen getrennt, dass UNVERIFIED/RESTRICTED nicht als sichtbare fremde Preise/Ersparnisse durchkommen.
+3. Sperrgründe gehören in Coverage-/Fehlerhinweise (Grau), niemals zu einer stillen Vollständigkeits- oder Null-Euro-Behauptung. PRIVATE_USER_HISTORY nur für eigene bestätigte, datierte Bonpreise mit HISTORICAL_PAID verarbeiten; keine externen Regularpreise oder künftigen Angebote als eigene Zahlung klassifizieren.
+4. ADR-017-Draft für v1.1.0-draft nicht produktiv einschalten, solange Chat 1 und Codex keine Freigabe/Abnehmerprüfung dokumentieren. Der Port muss typed unknownNeeds[], packageLines[] und mandatory savingsBasis=MERCHANDISE_ONLY vollständig abbilden und Mengen-/Warenpreis-/Pfand-/Checkout-Summen deterministisch mit Ganzzahlen prüfen; bei unbekanntem Pfand Checkout=null, niemals 0. PROVEN nur bei positiv und historisch belegtem Warenpreisvorteil.
+5. Den bestehenden Vergleichsvertrag 1.0.0-draft separat testbar lassen; keine stillen Versionsumstellungen, Room-/FoodStore-Schreibvorgänge oder App-Persistenz aus Vorschlägen.
+
+Nachweisbare Python-Referenz: CI 41228078142, 127 Tests erfolgreich einschließlich Rechte- und Negativproben. Android/JVM-/Room-/Gerätetest bleiben ausdrücklich Codex-Aufgabe, daher kein INTEGRATED-Status.
