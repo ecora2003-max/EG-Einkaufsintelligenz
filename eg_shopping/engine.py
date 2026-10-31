@@ -471,22 +471,26 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
 
 def suggest_purchases(needs_view: dict, products: list[dict], *,
                       shopping_date: str, budget: dict | None = None,
-                      capacity: dict | None = None) -> dict:
-    """Build conservative least-cost *known* mixed-pack proposals.
+                      capacity: dict | None = None, as_of: str | None = None) -> dict:
+    """Suggest mixed packs without turning missing price/deposit evidence into certainty.
 
-    Optimization is exact per food type for bounded candidate sets, but NOT a
-    global multi-food routing/budget optimum. All results remain proposals.
+    CostCents is merchandise only; checkout includes known per-pack deposit.
+    Budget remaining is UNKNOWN if any selected deposit is unknown.
+    Source validity is checked against the same price-observation contract as
+    compare_prices, if the host supplies a matching priceObservation and as_of.
     """
     from .pack_optimizer import PackSearchError, optimize_package_mix
 
     today = _day(shopping_date)
+    cutoff = _instant(as_of) if as_of is not None else None
     budget_valid = (isinstance(budget, dict) and budget.get("amountCents") is not None
                     and _day(budget["periodStart"]) <= today <= _day(budget["periodEnd"]))
     funds = _integer(budget["amountCents"], "budget", 0) if budget_valid else None
     known_subtotal = 0
+    known_checkout_subtotal = 0
+    checkout_complete = True
     rows, issues = [], []
-    capacity_known = isinstance(capacity, dict)
-    free_capacity = dict(capacity) if capacity_known else None
+    free_capacity = dict(capacity) if isinstance(capacity, dict) else None
     for need in sorted(needs_view.get("totals", []),
                        key=lambda n: (n["foodTypeId"], n["unit"], n["basis"])):
         amount = _integer(need["quantityToBuy"], "need quantity", 1)
@@ -497,21 +501,46 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                      n["quantityToBuy"] > 0]
         last_due = max(due_dates).isoformat() if due_dates else None
         offers = []
-        uncertain_price = False
+        source_issues = {}
+        product_by_id = {}
+        missing_product_prices = False
         for product in products:
             if product.get("foodTypeId") != need["foodTypeId"]:
                 continue
             q = _quantity(product.get("quantity"))
             if not q or q[1:] != (need["unit"], need["basis"]):
-                uncertain_price = True
+                missing_product_prices = True
                 continue
             if product.get("priceCents") is None:
-                uncertain_price = True
+                missing_product_prices = True
                 continue
             _integer(product["priceCents"], "priceCents")
+            pid = product["productId"]
+            product_by_id[pid] = product
+            evidence = product.get("priceObservation")
+            problems = []
+            if cutoff is None or not isinstance(evidence, dict):
+                problems.append("price observation/asOf UNKNOWN")
+            else:
+                eligible, notes = _valid(evidence, today, cutoff)
+                if not eligible:
+                    problems.extend(notes)
+                elif notes:
+                    problems.extend(notes)
+                art = evidence.get("article", {})
+                if (evidence.get("priceCents") != product["priceCents"] or
+                    _quantity(art.get("quantity")) != q or
+                    art.get("foodTypeId") != product["foodTypeId"]):
+                    problems.append("price observation does not match product/quantity")
+                if art.get("productRef") not in (None, pid):
+                    problems.append("product identity conflict")
+                if evidence.get("depositCents") != product.get("depositCents"):
+                    problems.append("deposit differs from source observation")
+            if product.get("minPacks", 1) > 1 and product.get("termsVerified") is not True:
+                problems.append("multibuy terms unverified")
+            source_issues[pid] = problems
             offers.append({
-                "productId": product["productId"], "amount": q[0],
-                "priceCents": product["priceCents"],
+                "productId": pid, "amount": q[0], "priceCents": product["priceCents"],
                 "minPacks": product.get("minPacks", 1),
                 "maxPacks": product.get("maxPacks"),
                 "shelfLifeDays": product.get("shelfLifeDays"),
@@ -526,8 +555,10 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             })
         if not offers:
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
-                         "reason": "no comparable priced pack", "costCents": None})
+                         "reason": "no comparable priced pack", "costCents": None,
+                         "checkoutCents": None})
             issues.append("total cost UNKNOWN")
+            checkout_complete = False
             continue
         try:
             plan = optimize_package_mix(amount, offers, shopping_date=shopping_date,
@@ -538,41 +569,62 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
         if plan["costCents"] is None:
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
                          "reason": plan["status"], "costCents": None,
-                         "warnings": plan["warnings"], "rejected": plan["rejected"]})
+                         "checkoutCents": None, "warnings": plan["warnings"],
+                         "rejected": plan["rejected"]})
             issues.append("total cost UNKNOWN")
+            checkout_complete = False
             continue
         price = plan["costCents"]
         known_subtotal += price
-        if funds is not None:
-            funds -= price
+        checkout = price
+        reasons = list(plan["warnings"])
+        for item in plan["items"]:
+            product = product_by_id[item["productId"]]
+            reasons.extend(source_issues[item["productId"]])
+            deposit = product.get("depositCents")
+            if deposit is None:
+                checkout = None
+                reasons.append("deposit/checkout cash UNKNOWN")
+            else:
+                _integer(deposit, "depositCents")
+                if checkout is not None:
+                    checkout += deposit * item["packs"]
+        if checkout is None:
+            checkout_complete = False
+            funds = None
+        else:
+            known_checkout_subtotal += checkout
+            if funds is not None:
+                if checkout > funds:
+                    reasons.append("checkout cash budget exceeded")
+                funds -= checkout
         if free_capacity is not None:
             for storage, used in plan.get("usedCapacityMl", {}).items():
                 if free_capacity.get(storage) is not None:
                     free_capacity[storage] = max(0, free_capacity[storage] - used)
-        reasons = list(plan["warnings"])
-        if uncertain_price:
+        if missing_product_prices:
             reasons.append("incomplete priced products for food type")
         if budget_valid and last_due is not None and _day(last_due) > _day(budget["periodEnd"]):
             reasons.append("budget period does not cover last demand")
         mix = plan["items"]
-        row = {
+        rows.append({
             "foodTypeId": need["foodTypeId"],
             "productId": mix[0]["productId"] if len(mix) == 1 else None,
             "packs": sum(item["packs"] for item in mix),
-            "mix": mix,
-            "quantityBought": plan["quantityBought"],
-            "costCents": price,
+            "mix": mix, "quantityBought": plan["quantityBought"],
+            "costCents": price, "checkoutCents": checkout,
             "status": ("FEASIBLE_NOT_PURCHASED" if plan["status"] ==
                        "FEASIBLE_NOT_PURCHASED" and not reasons else "REVIEW"),
             "reasons": sorted(set(reasons)),
             "optimalityProven": plan["optimalityProven"],
             "optimizationScope": plan["scope"],
             "rejectedCandidates": plan["rejected"],
-        }
-        rows.append(row)
+        })
     return {"items": rows, "knownSubtotalCents": known_subtotal,
             "totalCostCents": (known_subtotal if all(r.get("costCents") is not None for r in rows)
                                else None),
+            "knownCheckoutSubtotalCents": known_checkout_subtotal,
+            "totalCheckoutCents": (known_checkout_subtotal if checkout_complete else None),
             "budgetRemainingCents": funds, "issues": sorted(set(issues)),
             "optimizationScope": "PER_FOODTYPE_SEQUENTIAL",
             "sideEffects": []}
