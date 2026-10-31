@@ -199,17 +199,26 @@ def _coverage_gaps(coverage: dict | None) -> list[str]:
 def compare_prices(target: dict, observations: list[dict], shopping_date: str, *,
                    as_of: str, coverage: dict | None = None, matches: list[dict] | None = None,
                    allowed_stores: dict | None = None, allow_online: bool = False,
-                   historical: bool = False) -> dict:
+                   historical: bool = False,
+                   usage_context: str = "RESEARCH_ONLY",
+                   rights_grants: dict | None = None) -> dict:
     """Compare exact rational unit rates; emit v1 draft comparison.result payload.
 
     'as_of' is the evidence cutoff, not a wall-clock read. If coverage is not
     explicitly complete, GREY always accompanies other evidence-based signals.
     """
+    from .source_policy import source_gate
+
     day, cutoff = _day(shopping_date), _instant(as_of)
     if not isinstance(observations, list) or not isinstance(target, dict):
         raise DomainError("target and observations required")
     if not target.get("observationId"):
         raise DomainError("target.observationId required")
+    if not historical:
+        eligible, why = source_gate(target, usage_context=usage_context,
+                                    rights_grants=rights_grants)
+        if not eligible:
+            raise DomainError("target not eligible for price comparison: " + why)
     target_rate = _rate(target)
     if target_rate is None:
         raise DomainError("target price and confirmed comparable quantity required")
@@ -232,6 +241,12 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
                 continue
             raise DomainError(f"duplicate observationId: {oid}")
         used.add(oid)
+        gate_ok, gate_reason = source_gate(candidate, usage_context=usage_context,
+                                           rights_grants=rights_grants)
+        if not gate_ok:
+            rejected.append({"observationId": oid, "reason": gate_reason})
+            gaps.append(f"{oid}: source excluded ({gate_reason})")
+            continue
         valid, caveats = _valid(candidate, day, cutoff, historical, allow_online, allowed_stores)
         if not valid:
             reason = "; ".join(caveats)
@@ -847,14 +862,24 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
 
 def compare_catalog(observations: list[dict], shopping_date: str, *,
                     as_of: str, coverage: dict | None = None,
-                    allowed_stores: dict | None = None) -> dict:
+                    allowed_stores: dict | None = None,
+                    usage_context: str = "RESEARCH_ONLY",
+                    rights_grants: dict | None = None) -> dict:
     """Every eligible priced item is compared against every other snapshot item.
 
     Noncomparable/unknown-price observations are reported as omitted targets,
     never silently treated as zero. O(n^2), suitable for bounded app snapshots.
     """
+    from .source_policy import source_gate
+
     results, omitted = [], []
     for target in sorted(observations, key=lambda o: o.get("observationId", "")):
+        gate_ok, gate_reason = source_gate(target, usage_context=usage_context,
+                                           rights_grants=rights_grants)
+        if not gate_ok:
+            omitted.append({"observationId": target.get("observationId"),
+                            "reason": gate_reason})
+            continue
         if _rate(target) is None:
             omitted.append({"observationId": target.get("observationId"),
                             "reason": "unknown price or confirmed quantity"})
@@ -866,6 +891,7 @@ def compare_catalog(observations: list[dict], shopping_date: str, *,
                             "reason": "; ".join(reason)})
             continue
         results.append(compare_prices(target, observations, shopping_date, as_of=as_of,
-                                      coverage=coverage, allowed_stores=allowed_stores))
+                                      coverage=coverage, allowed_stores=allowed_stores,
+                                      usage_context=usage_context, rights_grants=rights_grants))
     return {"shoppingDate": shopping_date, "comparisons": results,
             "omittedTargets": omitted, "sideEffects": []}
