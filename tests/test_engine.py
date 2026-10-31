@@ -46,6 +46,15 @@ def compare(target, *others, coverage=None, **kw):
     return compare_prices(target, list(others), DATE, as_of=NOW, coverage=coverage, **kw)
 
 
+def with_price_evidence(product):
+    product = copy.deepcopy(product)
+    product["depositCents"] = 0
+    product["priceObservation"] = observation(
+        "PRICE-" + product["productId"], product["priceCents"],
+        food=product["foodTypeId"], q=product["quantity"], deposit=0)
+    return product
+
+
 class Comparisons(unittest.TestCase):
     def setUp(self):
         self.target = observation("BASE", 199)
@@ -248,8 +257,10 @@ class Comparisons(unittest.TestCase):
         ps = [{"productId": i.upper(), "foodTypeId": i, "quantity": quantity(500),
                "priceCents": 100, "shelfLifeDays": 60, "storageClass": "DRY",
                "packageVolumeMl": 800} for i in ("oats", "rice")]
+        ps = [with_price_evidence(p) for p in ps]
         b = {"amountCents": 250, "periodStart": DATE, "periodEnd": DATE}
-        out = suggest_purchases(view, ps, shopping_date=DATE, budget=b, capacity={"DRY": 1000})
+        out = suggest_purchases(view, ps, shopping_date=DATE, as_of=NOW,
+                                budget=b, capacity={"DRY": 1000})
         self.assertEqual(out["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
         self.assertIn("insufficient confirmed storage volume", out["items"][1]["reasons"])
 
@@ -377,9 +388,10 @@ class Projections(unittest.TestCase):
         products = [{"productId": "OATS500", "foodTypeId": "oats",
                      "quantity": quantity(500), "priceCents": 120,
                      "storageClass": "DRY", "packageVolumeMl": 750, "shelfLifeDays": 30}]
+        products = [with_price_evidence(p) for p in products]
         budget = {"amountCents": 300, "periodStart": DATE, "periodEnd": "2026-11-03"}
         r = suggest_purchases(view, products, shopping_date=DATE, budget=budget,
-                              capacity={"DRY": 2000})
+                              capacity={"DRY": 2000}, as_of=NOW)
         self.assertEqual((r["items"][0]["packs"], r["totalCostCents"]), (2, 240))
         self.assertEqual(r["budgetRemainingCents"], 60)
         self.assertEqual(r["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
