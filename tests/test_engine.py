@@ -307,6 +307,28 @@ class Projections(unittest.TestCase):
         with self.assertRaises(DomainError):
             project_needs({"asOf": DATE, "stock": [], "demands": [row, row]})
 
+    def test_unknown_demand_explicit_null_not_zero(self):
+        snapshot = {"asOf": DATE, "stock": [], "demands": [
+            {"eventId": "missing", "foodTypeId": "oats", "dueDate": DATE,
+             "quantity": None, "kind": "PREPARATION_RAW"}]}
+        r = project_needs(snapshot)
+        self.assertEqual(r["horizons"]["1"]["totals"], [])
+        self.assertIsNone(r["unknownNeeds"][0]["quantityToBuy"])
+        self.assertEqual(r["unknownNeeds"][0]["eventId"], "missing")
+        self.assertFalse(r["snapshotComplete"])
+
+    def test_actual_consumed_prepared_portions_do_not_create_raw_baseline(self):
+        history = [{"eventId": str(i), "date": f"2026-10-{i+10}",
+                    "foodTypeId": "oats", "quantity": quantity(70),
+                    "confirmed": True, "kind": "PORTION_CONSUMPTION"}
+                   for i in range(3)]
+        r = project_needs({"asOf": DATE, "stock": [], "demands": [],
+                           "consumptionHistory": history,
+                           "historyStart": "2026-10-10",
+                           "historyUntil": "2026-10-16"})
+        self.assertEqual(r["horizons"]["7"]["totals"], [])
+        self.assertEqual(r["unknownNeeds"], [])
+
     def test_baseline_actual_events_not_planned_on_same_day(self):
         hist = [{"eventId": str(i), "foodTypeId": "oats", "date": "2026-10-" + str(i+10),
                  "quantity": quantity(70), "confirmed": True} for i in range(3)]
