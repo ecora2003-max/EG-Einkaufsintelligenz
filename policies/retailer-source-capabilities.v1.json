@@ -1,0 +1,62 @@
+{
+  "policyVersion": "1.0.1",
+  "decidedAt": "2026-10-31",
+  "category": "PROJECT_FUNCTIONAL_CAPABILITY_NOT_LEGAL_PERMISSION",
+  "uses": [
+    "TARGETED_PRODUCT_PRICE_QUERY",
+    "PUBLISHED_OFFER_COLLECTION"
+  ],
+  "modes": {
+    "TARGETED_PRODUCT_PRICE_QUERY": "On-demand query for specified products/GTIN/food types with bounded responses; not a bulk price catalogue crawler.",
+    "PUBLISHED_OFFER_COLLECTION": "Collect explicitly published, dated offers with provenance and regional/store applicability; not a blanket right to copy flyers, media or whole databases."
+  },
+  "retailerCapabilities": {
+    "ALDI_NORD": {
+      "targetedProductPriceQuery": true,
+      "publishedOfferCollection": true
+    },
+    "ALDI_SUED": {
+      "targetedProductPriceQuery": true,
+      "publishedOfferCollection": true
+    },
+    "REWE": {
+      "targetedProductPriceQuery": true,
+      "publishedOfferCollection": true
+    },
+    "LIDL": {
+      "targetedProductPriceQuery": true,
+      "publishedOfferCollection": true
+    },
+    "PENNY": {
+      "targetedProductPriceQuery": false,
+      "publishedOfferCollection": true
+    },
+    "KAUFLAND": {
+      "targetedProductPriceQuery": false,
+      "publishedOfferCollection": true
+    },
+    "EDEKA": {
+      "targetedProductPriceQuery": false,
+      "publishedOfferCollection": true
+    },
+    "NETTO_MD": {
+      "targetedProductPriceQuery": false,
+      "publishedOfferCollection": true
+    }
+  },
+  "undecidedMeaning": "No retailer is undecided in this policy revision; false means functionally disallowed, true permitted for development subject to independent legal/source checks.",
+  "executionGates": {
+    "lawfulAccessRequired": true,
+    "sourceTermsAndDatabaseRightsPerSource": true,
+    "noLoginOrTechnicalProtectionBypass": true,
+    "noMassCatalogExtraction": true,
+    "noUncontrolledPolling": true,
+    "rateLimitAndTimeoutRequired": true,
+    "rawSourceProvenanceAndDateRequired": true,
+    "storeOrRegionalScopeMustBeReported": true,
+    "externalAppDisplayMustBeSeparatelyLawfullyGrounded": true,
+    "unknownSourceRightsMustNeverBePromotedToPermitted": true,
+    "userConfirmedReceiptHistoryRemainsSeparate": true
+  },
+  "staging": "CAPABILITY_APPROVED_FOR_DEVELOPMENT_ONLY; LIVE_USE_PENDING_SOURCE_SPECIFIC_LEGAL_AND_TECHNICAL_REVIEW"
+}
