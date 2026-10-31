@@ -240,6 +240,7 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
             if "unknown" in reason or "incomplete" in reason or "unverified" in reason or "proof" in reason:
                 gaps.append(f"{oid}: {reason}")
             continue
+        gaps.extend(f"{oid}: {note}" for note in caveats)
         level, evidence = _comparability(target, candidate, matches or [])
         if level not in ("EXACT_SKU", "SAME_FOOD_VARIANT", "FUNCTIONAL_SUBSTITUTE"):
             rejected.append({"observationId": oid, "reason": "; ".join(evidence)})
