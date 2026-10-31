@@ -15,7 +15,9 @@ def dispatch(message: dict) -> dict | list:
                    message["shoppingDate"], as_of=message["asOf"],
                    coverage=message.get("coverage"), matches=message.get("matches"),
                    allowed_stores=message.get("allowedStores"),
-                   allow_online=message.get("allowOnline", False))
+                   allow_online=message.get("allowOnline", False),
+                   usage_context=message.get("usageContext", "RESEARCH_ONLY"),
+                   rights_grants=message.get("rightsGrants"))
         if message.get("envelope"):
             return comparison_envelope(result, created_at=message["asOf"],
                                        trace_id=message["traceId"])
@@ -23,7 +25,9 @@ def dispatch(message: dict) -> dict | list:
     if op == "compareCatalog":
         return compare_catalog(message["observations"], message["shoppingDate"],
                    as_of=message["asOf"], coverage=message.get("coverage"),
-                   allowed_stores=message.get("allowedStores"))
+                   allowed_stores=message.get("allowedStores"),
+                   usage_context=message.get("usageContext", "RESEARCH_ONLY"),
+                   rights_grants=message.get("rightsGrants"))
     if op == "evaluateEarlyPurchase":
         return evaluate_early_purchase(message["need"], message["offer"],
             shopping_date=message["shoppingDate"], as_of=message["asOf"],
@@ -38,7 +42,9 @@ def dispatch(message: dict) -> dict | list:
     if op == "suggestPurchases":
         return suggest_purchases(message["needsView"], message["products"],
                    shopping_date=message["shoppingDate"], budget=message.get("budget"),
-                   capacity=message.get("capacity"), as_of=message.get("asOf"))
+                   capacity=message.get("capacity"), as_of=message.get("asOf"),
+                   usage_context=message.get("usageContext", "RESEARCH_ONLY"),
+                   rights_grants=message.get("rightsGrants"))
     if op == "evaluatePastPurchase":
         return evaluate_past_purchase(message["purchase"], message["historicalPrices"],
                    accessible_stores=message["accessibleStores"],
@@ -51,7 +57,9 @@ def dispatch(message: dict) -> dict | list:
                    preferred_retailers=message.get("preferredRetailers"),
                    preferred_food_types=message.get("preferredFoodTypes"),
                    walking_distance_by_store_m=message.get("walkingDistanceByStoreM"),
-                   max_walking_distance_m=message.get("maxWalkingDistanceM"))
+                   max_walking_distance_m=message.get("maxWalkingDistanceM"),
+                   usage_context=message.get("usageContext", "RESEARCH_ONLY"),
+                   rights_grants=message.get("rightsGrants"))
     raise DomainError("unrecognized operation")
 
 
