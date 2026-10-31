@@ -177,8 +177,10 @@ def optimize_package_mix(
                 if due is None or p["shelf"] is None or \
                    p["shelf"] < (due - today).days:
                     bad = True
+            quantities[i] = n
             visit(i + 1, units + n * p["q"], cost + n * p["price"],
                   new_used, new_missing, bad)
+            quantities[i] = 0
 
     visit(0, 0, 0, {}, set(), False)
     chosen = strict_best if strict_best is not None else fallback_best
