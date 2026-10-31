@@ -240,7 +240,9 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
         level, evidence = _comparability(target, candidate, matches or [])
         if level not in ("EXACT_SKU", "SAME_FOOD_VARIANT", "FUNCTIONAL_SUBSTITUTE"):
             rejected.append({"observationId": oid, "reason": "; ".join(evidence)})
-            if "missing" in "; ".join(evidence) or "unknown" in "; ".join(evidence):
+            reason_text = "; ".join(evidence)
+            if any(term in reason_text for term in (
+                    "missing", "unknown", "not established", "quantity or unit")):
                 gaps.append(f"{oid}: incomplete product comparability")
             continue
         rate_data = _rate(candidate, online_shipping=candidate.get("priceKind") == "ONLINE_LISTED")
