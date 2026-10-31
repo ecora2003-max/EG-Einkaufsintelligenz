@@ -28,3 +28,9 @@ Neu verifiziert: `eg_shopping/stockup.py` für quellengebundene vorgezogene Käu
 **Abnahme und exakte Kotlin-Portierung:** [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md), [`docs/KOTLIN_MIGRATION_SPEC.md`](docs/KOTLIN_MIGRATION_SPEC.md), [`examples/EXPECTED_RESULTS.md`](examples/EXPECTED_RESULTS.md). Die dokumentierte Testbasis ist synthetisch und rein offline.
 
 **Weitere geprüfte Invarianten:** Ein Produkt darf mehrere filialbezogene Preisbeobachtungen haben; belegte gegen nur behauptete/abgelaufene Preise werden getrennt. Unbekannte Checkout- und Pfandbedingungen liefern keine verifizierten Endkosten. Referenzlauf: [92 bestandene Tests](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222789227).
+
+## Experimenteller Shopping-Vertrag 1.1 (noch nicht freigegeben)
+
+Die neue Architekturversion `1.1.0-draft` wird nur über **expliziten Import** von `eg_shopping.draft_v11` testweise abgebildet; es erfolgt keine Änderung der bestehenden CLI und kein stiller Wechsel vom `1.0.0-draft`-Vertrag. Vier Shopping-Nachrichtentypen, die beiden unveränderten Architektur-Testkopien und Positiv-/Negativtests sind unter `docs/V11_DRAFT_COMPATIBILITY.md`, `contracts/v1.1/` und `tests/test_draft_v11.py` dokumentiert.
+
+**Neuster CI-Lauf:** [107/107 bestandene Tests](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224765046) für v1.0 und den optionalen v1.1-Draft gemeinsam. Die spätere Vertragsfreigabe und produktive Android-Integration sind davon ausdrücklich **nicht** umfasst.
