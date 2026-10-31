@@ -2,6 +2,7 @@
 import json
 import sys
 
+from .stockup import evaluate_early_purchase
 from .engine import (DomainError, compare_catalog, compare_prices, comparison_envelope,
                      evaluate_offer_interest, evaluate_past_purchase,
                      list_offer_interests, project_needs, suggest_purchases)
@@ -23,6 +24,15 @@ def dispatch(message: dict) -> dict | list:
         return compare_catalog(message["observations"], message["shoppingDate"],
                    as_of=message["asOf"], coverage=message.get("coverage"),
                    allowed_stores=message.get("allowedStores"))
+    if op == "evaluateEarlyPurchase":
+        return evaluate_early_purchase(message["need"], message["offer"],
+            shopping_date=message["shoppingDate"], as_of=message["asOf"],
+            budget=message.get("budget"), capacity=message.get("capacity"),
+            shelf_life_days=message.get("shelfLifeDays"),
+            storage_class=message.get("storageClass"),
+            package_volume_ml=message.get("packageVolumeMl"),
+            future_price=message.get("futurePrice"),
+            accessible_stores=message.get("accessibleStores"))
     if op == "projectNeeds":
         return project_needs(message["snapshot"], tuple(message.get("horizons", (1, 7, 28, 56))))
     if op == "suggestPurchases":
