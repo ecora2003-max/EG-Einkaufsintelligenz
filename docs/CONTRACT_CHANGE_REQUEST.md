@@ -36,3 +36,12 @@ Die vier zuvor vorgeschlagenen Shopping-Nachrichten sind inzwischen im **noch ni
 **Semantikpunkt CR-20261031-historical-savings-basis:** `savingsProvenCents` muss als reine **Warenpreisersparnis** oder als **Cash-/Checkout-Differenz** definiert werden. Der experimentelle Adapter setzt derzeit `savingsBasis=MERCHANDISE_ONLY`; unbekanntes Pfand bleibt ausdrücklich ungeklärt. Historische Filial-/Quellbeobachtung muss vor `purchaseAt` vorgelegen haben.
 
 Keine Änderungen am Architekturrepository. Der Vertrag v1.1 bleibt ausdrücklich Draft, kein Runtime-Upgrade ohne Freigabe.
+
+## Stand nach Architekturentscheidung ADR-017, 31.10.2026
+
+Die drei dokumentierten Sachprobleme wurden für den separaten Draft 1.1.0 durch die Architektursteuerung formal aufgegriffen:
+(1) unknownNeeds[] als eigener typisierter Nullable-Bedarf ohne fingierte Einheit;
+(2) packageLines[] für belegte Mischgebinde mit Waren-/Pfand-/Checkout-Komponenten und Originalpreisreferenzen;
+(3) savingsBasis=MERCHANDISE_ONLY als Pflichtangabe historischer Ersparnis.
+
+**Umsetzungsstand:** Lokale experimentelle Python-Adapter in eg_shopping/draft_v11.py wurden gegen Architektur-Schema-Blob dca777d219307a90bf3d4dff6189fbf12476c508 mit 127 erfolgreichen synthetischen Offline-Tests (CI 41228078142) verifiziert. Der alte v1.0-Vertrag bleibt unverändert. Die Anträge sind auf Ebene des 1.1-Draft berücksichtigt, **aber nicht endgültig produktiv freigegeben**. Offen bleiben Freigabe durch Architektursteuerung/Abnehmer, Kotlin-/App-Integration durch Codex und externer Quellenrechtsnachweis. Es erfolgt keine Änderung an Fremdrepositories.
