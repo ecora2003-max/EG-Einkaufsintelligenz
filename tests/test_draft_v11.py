@@ -34,7 +34,7 @@ def check(message):
 class DraftInterchange(unittest.TestCase):
     def test_all_canonical_draft_examples_are_schema_valid(self):
         jsonschema.Draft202012Validator.check_schema(DRAFT_SCHEMA)
-        self.assertEqual(len(DRAFT_EXAMPLES), 9)
+        self.assertGreaterEqual(len(DRAFT_EXAMPLES), 11)
         for m in DRAFT_EXAMPLES:
             with self.subTest(kind=m["messageType"]):
                 check(m)
@@ -112,6 +112,7 @@ class DraftInterchange(unittest.TestCase):
                 "checkoutCents": 224, "quantityBought": 500,
                 "mix": [{"productId": "OATS-500", "packs": 1,
                          "quantityBought": 500, "costCents": 199,
+                         "depositCents": 25, "checkoutCents": 224,
                          "observationId": "OFFER-1", "retailerId": "REWE",
                          "storeId": "R1"}], "reasons": []}
         out = check(purchase_suggestion_envelope(
@@ -124,6 +125,8 @@ class DraftInterchange(unittest.TestCase):
         self.assertEqual(out["payload"]["observationRefs"], ["OFFER-1"])
         self.assertEqual(out["payload"]["checkoutCents"], 224)
         self.assertFalse(out["payload"]["hasSideEffects"])
+        self.assertEqual(out["payload"]["packageLines"][0]["checkoutCents"], 224)
+        self.assertEqual(out["payload"]["packageLines"][0]["depositCents"], 25)
 
     def test_purchase_adapter_unverified_is_not_confirmed_cost(self):
         item = {"foodTypeId": "oats-fine", "status": "REVIEW",
@@ -144,16 +147,19 @@ class DraftInterchange(unittest.TestCase):
         item = {"status": "FEASIBLE_NOT_PURCHASED", "priceEvidenceVerified": True,
                 "costCents": 330, "checkoutCents": 330, "quantityBought": 1500,
                 "mix": [{"productId": "A", "packs": 1, "quantityBought": 1000,
-                         "costCents": 210, "observationId": "OA"},
+                         "costCents": 210, "depositCents": 0, "checkoutCents": 210,
+                         "observationId": "OA"},
                         {"productId": "B", "packs": 1, "quantityBought": 500,
-                         "costCents": 120, "observationId": "OB"}], "reasons": []}
+                         "costCents": 120, "depositCents": 0, "checkoutCents": 120,
+                         "observationId": "OB"}], "reasons": []}
         out = check(purchase_suggestion_envelope(
             item, need_ids=["N-1", "N-2"], unit="g", basis="NET",
             created_at=STAMP, trace_id="mixed", suggestion_id="M-1"))
         self.assertIsNone(out["payload"]["productId"])
         self.assertIsNone(out["payload"]["packageCount"])
         self.assertEqual(out["payload"]["observationRefs"], ["OA", "OB"])
-        self.assertEqual(out["payload"]["mix"][0]["costCents"], 210)
+        self.assertEqual(out["payload"]["packageLines"][0]["merchandiseCents"], 210)
+        self.assertEqual(out["payload"]["checkoutCents"], 330)
 
     def test_purchase_adapter_missing_one_mix_observation_cannot_prove_costs(self):
         item = {"status": "FEASIBLE_NOT_PURCHASED", "priceEvidenceVerified": True,
@@ -172,6 +178,53 @@ class DraftInterchange(unittest.TestCase):
         self.assertIsNone(out["payload"]["expectedCents"])
         self.assertIsNone(out["payload"]["checkoutCents"])
         self.assertIn("price observation not verified", out["payload"]["warnings"])
+
+    def test_ad017_unconfirmed_cash_is_null_for_unknown_deposit(self):
+        item = {"status": "FEASIBLE_NOT_PURCHASED", "priceEvidenceVerified": True,
+                "costCents": 100, "checkoutCents": None, "quantityBought": 500,
+                "mix": [{"productId": "P", "packs": 1, "quantityBought": 500,
+                         "costCents": 100, "observationId": "O",
+                         "depositCents": None, "checkoutCents": None}]}
+        result = check(purchase_suggestion_envelope(
+            item, need_ids=["N"], unit="g", basis="NET",
+            created_at=STAMP, trace_id="no-deposit", suggestion_id="NO-DEPOSIT"))
+        self.assertEqual(result["payload"]["expectedCents"], 100)
+        self.assertIsNone(result["payload"]["checkoutCents"])
+        self.assertIsNone(result["payload"]["packageLines"][0]["depositCents"])
+
+    def test_ad017_rejects_line_cash_arithmetic_mismatch(self):
+        item = {"status": "FEASIBLE_NOT_PURCHASED", "priceEvidenceVerified": True,
+                "costCents": 100, "checkoutCents": 150, "quantityBought": 500,
+                "mix": [{"productId": "P", "packs": 1, "quantityBought": 500,
+                         "costCents": 100, "depositCents": 25,
+                         "checkoutCents": 150, "observationId": "O"}]}
+        with self.assertRaises(DomainError):
+            purchase_suggestion_envelope(item, need_ids=["N"], unit="g",
+                basis="NET", created_at=STAMP, trace_id="bad-cash",
+                suggestion_id="BAD-CASH")
+
+    def test_ad017_unknown_without_due_date_remains_unresolved(self):
+        p = project_needs({"asOf": "2026-10-31", "stock": [], "demands": [
+            {"eventId": "UNK_DATE", "foodTypeId": "oats-fine",
+             "quantity": None}]}, horizons=(7,))
+        v = check(need_projection_envelope(p, horizon_days=7,
+            snapshot_at=SNAPSHOT, as_of=STAMP, trace_id="unk-date",
+            source_snapshot_refs=["S"]))
+        self.assertIsNone(v["payload"]["unknownNeeds"][0]["dueDate"])
+        self.assertEqual(v["payload"]["completeness"], "PARTIAL")
+
+    def test_ad017_savings_status_requires_positive_merchandise_delta(self):
+        report = {"noHindsight": True, "comparison": {
+            "alternatives": [{"observationId": "A"}],
+            "bestProvenMerchandiseSavingCents": None, "gaps": [],
+            "rejected": []}}
+        v = check(past_comparison_envelope(report,
+            purchase_ref="P", purchase_at="2026-10-31T09:00:00+01:00",
+            store_scope={"retailerId": "REWE", "storeId": "1",
+                         "scopeType": "STORE_CONFIRMED"},
+            created_at=STAMP, trace_id="no-save"))
+        self.assertNotEqual(v["payload"]["status"], "PROVEN")
+        self.assertIsNone(v["payload"]["savingsProvenCents"])
 
     def test_purchase_adapter_rejects_duplicate_need_ids(self):
         with self.assertRaises(DomainError):
