@@ -9,6 +9,12 @@ from .engine import (DomainError, compare_catalog, compare_prices, comparison_en
 
 
 def dispatch(message: dict) -> dict | list:
+    # A caller-controlled JSON body cannot authenticate rights grants. The
+    # Android/host adapter must verify provenance and purpose outside this CLI.
+    if message.get("usageContext", "RESEARCH_ONLY") != "RESEARCH_ONLY":
+        raise DomainError("APP_DISPLAY and private history require trusted host adapter")
+    if message.get("rightsGrants") is not None:
+        raise DomainError("untrusted JSON rights grants are not accepted")
     op = message.get("operation")
     if op == "comparePrices":
         result = compare_prices(message["target"], message["observations"],
