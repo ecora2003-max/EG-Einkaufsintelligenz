@@ -495,6 +495,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
     known_subtotal = 0
     known_checkout_subtotal = 0
     checkout_complete = True
+    merchandise_complete = True
     rows, issues = [], []
     free_capacity = dict(capacity) if isinstance(capacity, dict) else None
     for need in sorted(needs_view.get("totals", []),
@@ -609,6 +610,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                          "costCents": None, "checkoutCents": None})
             issues.append("total cost UNKNOWN")
             checkout_complete = False
+            merchandise_complete = False
             continue
         try:
             plan = optimize_package_mix(amount, verified_offers or offers,
@@ -627,6 +629,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                          "warnings": plan["warnings"], "rejected": plan["rejected"]})
             issues.append("total cost UNKNOWN")
             checkout_complete = False
+            merchandise_complete = False
             continue
         price = sum(product_by_id[item["productId"]]["priceCents"] * item["packs"]
                     for item in plan["items"])
@@ -644,6 +647,13 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 reasons.append("deposit/checkout cash UNKNOWN")
             elif checkout is not None:
                 checkout += deposit * item["packs"]
+        source_verified = all(not source_issues[item["productId"]]
+                              for item in plan["items"])
+        estimated_checkout = checkout
+        if not source_verified:
+            merchandise_complete = False
+            reasons.append("price source not proven; checkout cost UNKNOWN")
+            checkout = None
         if checkout is None:
             checkout_complete = False
             funds = None
@@ -679,6 +689,8 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             "packs": sum(item["packs"] for item in mix),
             "mix": mix, "quantityBought": plan["quantityBought"],
             "costCents": price, "checkoutCents": checkout,
+            "estimatedCheckoutCents": (estimated_checkout if not source_verified else None),
+            "priceEvidenceVerified": source_verified,
             "status": ("FEASIBLE_NOT_PURCHASED" if plan["status"] ==
                        "FEASIBLE_NOT_PURCHASED" and not reasons else "REVIEW"),
             "reasons": sorted(set(reasons)),
@@ -687,7 +699,8 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             "rejectedCandidates": plan["rejected"],
         })
     return {"items": rows, "knownSubtotalCents": known_subtotal,
-            "totalCostCents": (known_subtotal if all(r.get("costCents") is not None for r in rows)
+            "totalCostCents": (known_subtotal if merchandise_complete and
+                               all(r.get("costCents") is not None for r in rows)
                                else None),
             "knownCheckoutSubtotalCents": known_checkout_subtotal,
             "totalCheckoutCents": (known_checkout_subtotal if checkout_complete else None),
