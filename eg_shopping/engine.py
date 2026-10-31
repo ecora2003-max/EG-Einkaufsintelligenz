@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from fractions import Fraction
+from zoneinfo import ZoneInfo
 from math import ceil
 from typing import Any
 
@@ -144,7 +145,7 @@ def _valid(obs: dict, shopping_date: date, as_of: datetime, historical: bool = F
         return False, ["not valid on shopping date"]
     # Non-sale price observed for one day is not proof of a later/earlier day.
     if kind != "SALE" and (start is None or end is None):
-        if observed.date() != shopping_date:
+        if observed.astimezone(ZoneInfo('Europe/Berlin')).date() != shopping_date:
             return False, ["no dated validity proof for requested day"]
     if historical and kind == "ONLINE_LISTED":
         return False, ["online checkout not proven at past store"]
