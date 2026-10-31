@@ -21,4 +21,6 @@ python -m pip install 'jsonschema[format]==4.23.0'
 python -m unittest discover -s tests -v
 ```
 
-**CI-Stand 31.10.2026:** 62/62 bestandene Offline- und Vertrags-Tests (https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220579678). Das beweist keine Live-Datenabdeckung oder Android-Integration. Der gemeinsame Vertrag ist `1.0.0-draft`; produktiver Status **`PARTIAL_READY`**.
+**CI-Stand 31.10.2026:** 74/74 bestandene Offline- und Vertrags-Tests (https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220994053). Das beweist keine Live-Datenabdeckung oder Android-Integration. Der gemeinsame Vertrag ist `1.0.0-draft`; produktiver Status **`PARTIAL_READY`**.
+
+Neu verifiziert: `eg_shopping/stockup.py` für quellengebundene vorgezogene Käufe. Angebotsinteressen erlauben FoodType- und durch Host belegte Laufwegfilter.
