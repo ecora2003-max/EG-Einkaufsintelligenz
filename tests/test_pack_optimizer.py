@@ -171,7 +171,8 @@ class MixedPackaging(unittest.TestCase):
                                "quantity": base_q(500), "priceCents": 80,
                                "shelfLifeDays": 30, "storageClass": "DRY",
                                "packageVolumeMl": 500})
-        cheap["priceObservation"]["validUntil"] = "2026-10-01"
+        cheap["priceObservation"]["validFrom"] = "2026-10-01"
+        cheap["priceObservation"]["validUntil"] = "2026-10-15"
         # A fully valid, more expensive offer is a better evidence-based choice.
         good = with_evidence({"productId": "GOOD", "foodTypeId": "oats",
                               "quantity": base_q(500), "priceCents": 120,
