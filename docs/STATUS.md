@@ -91,3 +91,26 @@ python -m unittest discover -s tests -v
 **Offen / Grenzen:** Gemeinsame v1.1-Freigabe und entsprechende Adapter-/Schema-Abnahme; Codex-Kotlin-/Room-/Compose-Integration; Händlerquellenrechte, echte Filial- und Marktpreisabdeckung; globale Mehr-FoodType-/Routenoptimierung, vollständige Coupon-/Pfand-Retourenmodelle. Keine behauptete absolute Bestpreis- oder Live-Verfügbarkeitsgarantie.
 
 **Nächster Schritt und Wiederaufnahme:** Bis zur ausdrücklichen Vertragsfreigabe oder einem reproduzierbaren Regressionstest **keine weiteren Fachcodeänderungen**. Bei neuer Anforderung Architektur-Commit und Entscheidungen frisch lesen, v1.1-Feldabbildung als getrennten Adapter entwickeln, Schema-Positiv-/Negativtests und gesamte Offline-Suite erneut ausführen; Ergebnis mit Commit-SHA und CI-Logs hier dokumentieren. Nur dieses Repository darf beschrieben werden; `INTEGRATED` bleibt Codex vorbehalten.
+
+## Entwicklungsfortsetzung 31.10.2026, 18:22–18:30 Uhr Berlin – experimenteller v1.1-Adapter
+
+**Aktuelle Architekturbasis:** `EG-Architecture` main `ecd26097eb5678296a14de9d9b5db79ccea9be64`. Neu existiert `contracts/v1.1` mit vier Shopping-Nachrichten im Status **`1.1.0-draft`**. Die beiden Dateien wurden als unveränderte **Testkopien** unter `contracts/v1.1/` in dieses Repository übernommen. Architektur- und Haupt-App-Repositories wurden nicht geschrieben.
+
+**Implementiert:** `eg_shopping/draft_v11.py` als ausschließlich direkt importierbarer, eigenständiger experimenteller Adapter für `shopping.need.projection`, `shopping.purchase.suggestion`, `shopping.offer.interest`, `shopping.past.comparison`. Es gibt **keine** automatische 1.1-Versionsumschaltung, keine CLI-Freigabe und keine Änderung der vorhandenen `1.0.0-draft`-Envelopes. Die Ausgaben dokumentieren unbekannte Werte und Referenzen; keine Kauf-/Bestandsbuchungen. Nicht bekannte Rohbedarfs-Einheiten werden **nicht erfunden**: Typisierte Bedarfszeilen bleiben aus, und die unveränderten IDs, Fälligkeitsdaten und Null-Mengen werden in einer `unknownNeeds[]`-Extension mit `completeness=PARTIAL` transportiert. Bei gemischten Packungen mit fehlender Angebotsbeobachtungs-ID sind `expectedCents` und `checkoutCents` ausdrücklich `null`, selbst bei vom Host behauptetem `priceEvidenceVerified=true`.
+
+**Tatsächlich ausgeführte neue Testnachweise:**
+
+- [GitHub Actions 41224489521](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224489521): **106 bestanden / 0 fehlgeschlagen / 0 übersprungen**, PR-Merge `6d2ff53` mit main-Stand `2c25588dd183e2c6d8c73ba318d47bb54f0981d1`.
+- [GitHub Actions 41224632634](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224632634): **106 bestanden / 0 fehlgeschlagen / 0 übersprungen**, PR-Merge `004077f`, main-Stand `d59093b7e1eed61d39d88fa345aa74b10d91eb38` (unbekannte Bedarfe verlustfrei als Extension).
+- **Neuester fachlich verbindlicher Test:** [GitHub Actions 41224765046](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41224765046), Python 3.12/Ubuntu, PR-Merge `67084be` auf main-Stand `f56ade91d2192d41cb21ac780d6f9937d6722702`: **107 bestanden, 0 fehlgeschlagen, 0 übersprungen**. PR #5 wurde anschließend unter Commit `da08f07122a4924f1437b0bb2a1a6e9c524762c7` in das einzige Schreibrepository gemergt.
+
+**Ausgeführte Befehle auf GitHub Actions:**
+
+```bash
+python -m pip install 'jsonschema[format]==4.23.0'
+python -m unittest discover -s tests -v
+```
+
+`tests/test_draft_v11.py` validiert die **neun** kanonischen Architektur-Beispielnachrichten mit `jsonschema.Draft202012Validator` und Formatchecker; alle vier experimentellen Adapter mit Positiv-/Negativfällen; zusätzlich laufen alle bisherigen 1.0-Offline-Abnahmetests. Der neue Draft ist daher **SCHEMA_TESTED / EXPERIMENTAL**, keinesfalls als fertiger gemeinsamer Integrationsvertrag freigegeben. Der **bereits abgenommene unveränderte v1.0-Offline-Kern** bleibt `READY_FOR_INTEGRATION`.
+
+**Offene v1.1-Freigabefragen:** Vollständig typisierbarer unbekannter `Quantity.unit`-Wert, `packageLines[]` für gemischte Gebinde und Definition der `savingsProvenCents`-Bezugsgröße (Warenpreis oder Checkout). Dazu stehen begründete Anforderungen im **eigenen** `docs/CONTRACT_CHANGE_REQUEST.md` und Feldzuordnungen in `docs/V11_DRAFT_COMPATIBILITY.md`. Keine automatische v1.1-Freigabe ohne Architektur-ADR und Codex-Abnehmerprüfung, keine Android- oder Live-Datenabnahme. Die nächsten Ausführungen sollen zuerst Version/SHAs und CI erneut lesen; bei neuem Architekturentscheid Schema/Adapter aktualisieren und vollständige Tests ausführen, sonst den abgenommenen Referenzkern nicht ohne Anlass verändern.
