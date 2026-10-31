@@ -27,6 +27,26 @@ def base_q(amount):
     return {"amount": amount, "unit": "g", "basis": "NET", "confirmed": True}
 
 
+def with_evidence(p):
+    p = copy.deepcopy(p)
+    p["depositCents"] = 0
+    p["priceObservation"] = {
+        "observationId": "PRICE-" + p["productId"],
+        "article": {"label": "Synthetic " + p["productId"],
+                    "foodTypeId": p["foodTypeId"], "organic": False,
+                    "brandKind": "PRIVATE_LABEL", "quantity": p["quantity"]},
+        "scope": {"retailerId": "SYNTHETIC", "storeId": "S1",
+                  "scopeType": "STORE_CONFIRMED"},
+        "priceCents": p["priceCents"], "currency": "EUR",
+        "priceKind": "LISTED_REGULAR", "validFrom": DATE, "validUntil": DUE,
+        "depositCents": 0,
+        "source": {"origin": "fixture", "observedAt": "2026-10-31T14:00:00+01:00",
+                   "dataQuality": "CONFIRMED", "rightsStatus": "UNVERIFIED"},
+        "availability": "IN_STOCK_REPORTED",
+    }
+    return p
+
+
 class MixedPackaging(unittest.TestCase):
     def test_mix_better_than_single_cheapest_unit_rate(self):
         # 1kg at 210c has better €/kg, but 1kg+0.5kg costs 330c
@@ -156,9 +176,11 @@ class MixedPackaging(unittest.TestCase):
                      "quantity": base_q(500), "priceCents": 120,
                      "storageClass": "DRY", "packageVolumeMl": 500,
                      "shelfLifeDays": 30}]
+        products = [with_evidence(p) for p in products]
         budget = {"amountCents": 400, "periodStart": DATE, "periodEnd": "2026-11-07"}
         r = suggest_purchases(view, products, shopping_date=DATE,
-                              budget=budget, capacity={"DRY": 2000})
+                              budget=budget, capacity={"DRY": 2000},
+                              as_of="2026-10-31T15:00:00+01:00")
         self.assertEqual(r["totalCostCents"], 330)
         self.assertEqual(r["budgetRemainingCents"], 70)
         self.assertIsNone(r["items"][0]["productId"])
