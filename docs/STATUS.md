@@ -1,6 +1,6 @@
 # Status und Wiederaufnahme — EG-Einkaufsintelligenz
 
-**Datum:** 31.10.2026, **Vertrag:** EG-Architecture `1.0.0-draft` (zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`). **Status: `PARTIAL_READY / OFFLINE_VERIFIED`**, ausdrücklich noch **nicht** `READY_FOR_INTEGRATION` oder `INTEGRATED`.
+**Datum:** 31.10.2026, **Vertrag:** EG-Architecture `1.0.0-draft` (zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`). **Status: `READY_FOR_INTEGRATION` für den ausschließlich offline arbeitenden Python-Referenzkern**, ausdrücklich **nicht** `SOURCE_VERIFIED` oder `INTEGRATED`.
 
 ## Tatsächlich implementiert
 
@@ -59,3 +59,8 @@ Neu: `eg_shopping/stockup.py` belegt moegliche fruehe Einkaeufe anhand heute gue
 
 ## Verifikation 31.10.2026, vierter Meilenstein
 CI https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221288821 : 77/77 bestanden, 0 fehlgeschlagen, 0 uebersprungen; `python -m unittest discover -s tests -v` nach `jsonschema[format]==4.23.0`, getestet gegen main `2735680577135551b4fc9ed8a7d4bee148de24aa` im PR-Merge `5dfd03e`. Historische Kaufersparnis wurde korrigiert: ein guenstigerer Einheitspreis bei groesserem Mindestgebinde beweist keine niedrigeren damaligen Ausgaben. Ausgewiesen werden erforderliche Packungen, damals belegbare Waren-/Checkout-Kosten, tatsaechliche Ersparnis oder nur `unitOnlyAlternatives`. Unbekanntes Pfand bleibt null. STATUS weiterhin PARTIAL_READY bis restliche Randbedingungen/Integration geprueft sind.
+
+## Abschluss der Offline-Modulabnahme – 31.10.2026
+**Abnahmestatus: READY_FOR_INTEGRATION (nur deterministischer, rein offline arbeitender Referenzkern)**. Alle 18 individuellen Pflichtszenarien sind durch ausgeführte Tests belegt, Zuordnung in `docs/ACCEPTANCE_REPORT.md`. Aktuelle CI https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221646056 : 82/82 Pass, 0 Fail, 0 Skip, getestet main `4593b195860432426c878d8535b969f05f779db7` im PR-Merge `ebde5c7`, Python 3.12, Befehl `python -m pip install 'jsonschema[format]==4.23.0'` und `python -m unittest discover -s tests -v`. Vergleich, Einkauf, Bedarfsprognose, Angebotsinteresse, historischer Kauf, nachgewiesene Angebotsvorverlegung, CLI und Schema-Export sind offline lauffähig. End-to-End-CLI mit synthetischen JSON-Dateien getestet. Genaue Kotlin-Portierung beschrieben in `docs/KOTLIN_MIGRATION_SPEC.md`.
+
+**Freigabegrenze:** Dieser Status gilt nicht fuer reale Supermarkt-Datenbeschaffung, Filialpreise, Lizenzrechte, Live-APIs, Android-Installation, Room/Compose-Oberflaechen, Migrations- oder Geraetetests. Architektur-Contract bleibt `1.0.0-draft`. Nachzuziehende App-Integration und abweichende Vertragsfreigaben bleiben Codex/Architektursteuerung vorbehalten. Keine Nutzer- oder Lagerbuchung im Modul. Optionale Weiterentwicklungen (globale Laden-/Warenkorbroute, Coupon-Kombinationen, Retouren-Pfand) sind keine behaupteten bestehenden Faehigkeiten. Ab jetzt nur bei Regression, freigegebener Vertragsaenderung oder neuer Anforderung weiterentwickeln; sonst offline als uebergabereif belassen.
