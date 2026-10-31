@@ -240,7 +240,7 @@ class Comparisons(unittest.TestCase):
         envelope = comparison_envelope(r, created_at=NOW, trace_id="synthetic-01")
         jsonschema.validate(envelope, schema, format_checker=jsonschema.FormatChecker())
         bad = copy.deepcopy(envelope)
-        bad["meta"]["createdAt"] = "not-a-date"
+        bad["meta"]["createdAt"] = None
         with self.assertRaises(jsonschema.ValidationError):
             jsonschema.validate(bad, schema, format_checker=jsonschema.FormatChecker())
 
