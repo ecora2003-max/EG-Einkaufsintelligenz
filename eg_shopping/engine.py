@@ -549,8 +549,29 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                     problems.append("price observation does not match product/quantity")
                 if art.get("productRef") not in (None, pid):
                     problems.append("product identity conflict")
+                if "organic" in product and product["organic"] != art.get("organic"):
+                    problems.append("organic status differs from price observation")
+                if "attributes" in product and product["attributes"] != art.get("attributes"):
+                    problems.append("variant attributes differ from price observation")
+                if product.get("gtin") and product["gtin"] != art.get("gtin"):
+                    problems.append("GTIN differs from price observation")
+                if product.get("retailerId") and product["retailerId"] != (
+                        evidence.get("scope") or {}).get("retailerId"):
+                    problems.append("retailer differs from price observation")
+                if product.get("storeId") and product["storeId"] != (
+                        evidence.get("scope") or {}).get("storeId"):
+                    problems.append("store differs from price observation")
+                if product.get("priceKind") and product["priceKind"] != evidence.get("priceKind"):
+                    problems.append("price kind conflicts with source observation")
+                for field in ("validFrom", "validUntil"):
+                    if product.get(field) is not None and product[field] != evidence.get(field):
+                        problems.append(f"{field} conflicts with source observation")
                 if evidence.get("depositCents") != product.get("depositCents"):
                     problems.append("deposit differs from source observation")
+            if product.get("conditional"):
+                problems.append("candidate coupon or membership condition unverified")
+            if product.get("availability") == "OUT_OF_STOCK_REPORTED":
+                problems.append("candidate reported out of stock")
             if product.get("minPacks", 1) > 1 and product.get("termsVerified") is not True:
                 problems.append("multibuy terms unverified")
             deposit = product.get("depositCents")
