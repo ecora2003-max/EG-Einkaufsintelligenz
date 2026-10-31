@@ -701,7 +701,12 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
 
 def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
                            accessible_stores: dict, coverage: dict | None = None) -> dict:
-    """No hindsight: cutoff at actual purchase instant and require store evidence."""
+    """Prove actual past purchase savings, not just cheaper unit prices.
+
+    Buying one larger multipack may have a lower rate but a higher minimum
+    checkout. Those are disclosed as unit-only comparisons, NEVER asserted
+    past money saved. Refundable deposit is separately unknown if missing.
+    """
     if purchase.get("confirmed") is not True or not purchase.get("purchaseAt"):
         return {"status": "UNKNOWN", "reason": "confirmed purchase timestamp missing",
                 "comparison": None}
@@ -711,7 +716,53 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
     result = compare_prices(purchase, historical_prices, when.date().isoformat(),
                             as_of=purchase["purchaseAt"], coverage=coverage,
                             allowed_stores=accessible_stores, historical=True)
-    return {"status": "EVIDENCED_ALTERNATIVES" if result["alternatives"] else "NOT_PROVEN",
+    target_qty = _quantity(purchase.get("article", {}).get("quantity"))
+    if target_qty is None:
+        raise DomainError("confirmed historical purchase quantity required")
+    _integer(purchase["priceCents"], "historicalPaidCents")
+    candidates = {p["observationId"]: p for p in historical_prices}
+    payable, unit_only = [], []
+    for row in result["alternatives"]:
+        alt = candidates[row["observationId"]]
+        alt_qty = _quantity(alt.get("article", {}).get("quantity"))
+        if alt_qty is None or alt_qty[1:] != target_qty[1:]:
+            continue
+        packs = (target_qty[0] + alt_qty[0] - 1) // alt_qty[0]
+        known_cost = packs * _integer(alt["priceCents"], "alternatePriceCents")
+        explained = dict(row)
+        explained["packsRequired"] = packs
+        explained["historicalPurchaseCostCents"] = known_cost
+        difference = purchase["priceCents"] - known_cost
+        explained["historicalMerchandiseSavingsCents"] = (difference if difference > 0 else None)
+        actual_deposit = purchase.get("depositCents")
+        other_deposit = alt.get("depositCents")
+        if actual_deposit is None or other_deposit is None:
+            explained["historicalCheckoutSavingsCents"] = None
+        else:
+            explained["historicalCheckoutSavingsCents"] = (
+                purchase["priceCents"] + _integer(actual_deposit, "purchaseDepositCents") -
+                (known_cost + packs * _integer(other_deposit, "alternativeDepositCents")))
+        if difference > 0:
+            payable.append(explained)
+        else:
+            explained["evidence"].append(
+                "lower unit rate but minimum purchasable packages are not cheaper")
+            unit_only.append(explained)
+    result["unitOnlyAlternatives"] = unit_only
+    result["alternatives"] = payable
+    signals = []
+    if any(a["bioDifference"] == "SAME" and a["comparability"] != "FUNCTIONAL_SUBSTITUTE"
+           for a in payable):
+        signals.append(SIGNALS[0])
+    if any(a["bioDifference"] == "DIFFERENT" and a["comparability"] != "FUNCTIONAL_SUBSTITUTE"
+           for a in payable):
+        signals.append(SIGNALS[1])
+    if SIGNALS[2] in result["signals"]:
+        signals.append(SIGNALS[2])
+    result["signals"] = signals
+    savings = [p["historicalMerchandiseSavingsCents"] for p in payable]
+    result["bestProvenMerchandiseSavingCents"] = max(savings) if savings else None
+    return {"status": "EVIDENCED_ALTERNATIVES" if payable else "NOT_PROVEN",
             "comparison": result, "noHindsight": True}
 
 
