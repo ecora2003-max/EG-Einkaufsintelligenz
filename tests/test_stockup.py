@@ -107,6 +107,16 @@ class EarlyPurchase(unittest.TestCase):
         self.assertIsNone(r["savingsProvenCents"])
         self.assertEqual(r["status"], "REVIEW")
 
+    def test_future_bio_mismatch_cannot_be_like_for_like_savings(self):
+        r = evaluate(future=obs("CONVENTIONAL", 160, start=DUE,
+                                kind="LISTED_REGULAR", organic=False))
+        self.assertEqual(r["status"], "REVIEW")
+        self.assertIsNone(r["savingsProvenCents"])
+        self.assertIn("future price organic status not like-for-like", r["reasons"])
+        r = evaluate(future=obs("UNKNOWN_BIO", 160, start=DUE,
+                                kind="LISTED_REGULAR", organic=None))
+        self.assertEqual(r["status"], "REVIEW")
+
     def test_offer_starts_after_shopping_day(self):
         r = evaluate(current=obs("LATER", 100, start="2026-11-01"))
         self.assertEqual(r["status"], "REVIEW")
