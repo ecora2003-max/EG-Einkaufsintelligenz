@@ -40,6 +40,16 @@ Stock: `{lotId,foodTypeId,quantity,usableUntil,safe,available}`; nur ausdrückli
 
 Zulässige Interessenaktionen: `INTERESTED`, `UNDECIDED`, `NOT_TODAY`, `HIDE_PRODUCT`, `HIDE_FOOD_TYPE`, `ADD_TO_SHOPPING_LIST`. Keine Aktion schreibt Bestände oder bestätigt einen Kauf. Listen- und Preisvergleiche sind getrennte DTOs. Der Host übernimmt nach Nutzerentscheidung allein die Persistenz.
 
+## Erweiterung: gemischte Packungsoptimierung (aktuelle Referenz)
+
+`eg_shopping/pack_optimizer.py:optimize_package_mix` durchsucht für **einen** bestätigten FoodType mit gleicher Mengenbasis alle Kandidatenmischungen exakt bis zur begrenzten Suchgröße (`max_nodes` standardmäßig 250000, höchstens acht Preisvarianten). Der Output gibt `items[]` mit `productId`, `packs`, `quantityBought`, `costCents`, `optimalityProven`, `warnings` und `scope=EXACT_PER_FOODTYPE_ONLY` aus. Bei Überschreiten von Suchgrenzen: `SEARCH_LIMIT` und keine erfundene optimale Kaufempfehlung.
+
+`suggest_purchases` nutzt den Optimierer **pro Lebensmitteltyp** und rechnet nach jeder Zuteilung Budget und Lagerkapazität fort. Die Reihenfolge nach FoodType ist deterministisch, aber **nicht global budgetoptimal über unterschiedliche Lebensmittel**. Bei mehreren Gebinden ist `productId=null`, `mix[]` beschreibt die Einzelgebinde. `FEASIBLE_NOT_PURCHASED` bedeutet ausschließlich *rechnerisch anhand bekannter Inputannahmen ausführbar*, weder verfügbare Ware garantiert noch reserviert. Keine Buchung.
+
+Multibuy-Schwellen mit `minPacks` werden nur berücksichtigt, wenn die vorgeschlagene Bestellanzahl den Mindestwert tatsächlich erreicht; die entsprechende Preis-/Aktionsgültigkeit muss der Host belegen. Beliebige `conditional[]`-Texte (App-Mitgliedschaft/Coupon) gelten **nicht** als erfüllt und schließen die rabattierte Option aus. `ONLINE_LISTED` bleibt in diesem Packungsoptimierer ausgeschlossen, weil eine verlässliche Zuordnung einmaliger Versandkosten zum gesamten Warenkorb nicht modelliert ist. Berücksichtigte Mengenbereiche: bestätigte `quantity.amount`, `unit`, `basis`; `packageCount` wird exakt multipliziert.
+
+Bei unbekanntem Rohbedarf enthält `project_needs` zusätzlich `unknownNeeds[]` mit `quantityToBuy=null`; die kumulative Bedarfssumme behauptet dadurch keine bekannte Null. Historische Portionen konsumierter Fertiggerichte (`kind=PORTION_CONSUMPTION` bzw. `COOKED_MEAL_CONSUMPTION`) fließen nicht als Rohzutaten-Verbrauchsbaseline ein.
+
 ## Nachweis und offene Integration
 
 Installieren für Tests: `python -m pip install 'jsonschema[format]==4.23.0'` und `python -m unittest discover -s tests -v`. GitHub Actions prüft dieses Kommando bei Push/PR. Der formale Contract-Validator läuft gegen alle vorhandenen `contracts/v1/examples.json` und einen erzeugten `comparison.result`-Envelope.
