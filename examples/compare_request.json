@@ -1,0 +1,85 @@
+{
+  "operation": "comparePrices",
+  "shoppingDate": "2026-10-31",
+  "asOf": "2026-10-31T15:00:00+01:00",
+  "coverage": {
+    "complete": false,
+    "gaps": [
+      "synthetic partial retailer coverage"
+    ]
+  },
+  "target": {
+    "observationId": "T",
+    "article": {
+      "label": "Synthetic organic oats 500g",
+      "foodTypeId": "oats-fine",
+      "brandKind": "PRIVATE_LABEL",
+      "brandName": "Demo",
+      "organic": true,
+      "attributes": {
+        "form": "fine"
+      },
+      "quantity": {
+        "amount": 500,
+        "unit": "g",
+        "basis": "NET",
+        "confirmed": true
+      }
+    },
+    "scope": {
+      "retailerId": "LIDL",
+      "storeId": "L1",
+      "scopeType": "STORE_CONFIRMED"
+    },
+    "priceCents": 199,
+    "currency": "EUR",
+    "priceKind": "SALE",
+    "validFrom": "2026-10-31",
+    "validUntil": "2026-11-06",
+    "source": {
+      "origin": "synthetic",
+      "observedAt": "2026-10-31T09:00:00+01:00",
+      "rightsStatus": "UNVERIFIED",
+      "dataQuality": "SOURCED"
+    },
+    "availability": "IN_STOCK_REPORTED"
+  },
+  "observations": [
+    {
+      "observationId": "B",
+      "article": {
+        "label": "Synthetic organic oats 500g alternative",
+        "foodTypeId": "oats-fine",
+        "brandKind": "MANUFACTURER",
+        "brandName": "Demo Brand",
+        "organic": true,
+        "attributes": {
+          "form": "fine"
+        },
+        "quantity": {
+          "amount": 500,
+          "unit": "g",
+          "basis": "NET",
+          "confirmed": true
+        }
+      },
+      "scope": {
+        "retailerId": "REWE",
+        "storeId": "R1",
+        "scopeType": "STORE_CONFIRMED"
+      },
+      "priceCents": 179,
+      "currency": "EUR",
+      "priceKind": "LISTED_REGULAR",
+      "validFrom": null,
+      "validUntil": null,
+      "source": {
+        "origin": "synthetic",
+        "observedAt": "2026-10-31T10:00:00+01:00",
+        "rightsStatus": "UNVERIFIED",
+        "dataQuality": "SOURCED"
+      },
+      "availability": "IN_STOCK_REPORTED"
+    }
+  ]
+}
