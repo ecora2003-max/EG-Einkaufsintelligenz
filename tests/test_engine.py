@@ -113,6 +113,19 @@ class Comparisons(unittest.TestCase):
         drained = observation("DRAIN", 50, q=quantity(500, basis="DRAINED"))
         self.assertEqual(compare(self.target, drained)["alternatives"], [])
 
+    def test_explicit_null_package_count_and_missing_timestamp_stay_unknown(self):
+        alt = observation("NOCOUNT", 30)
+        alt["article"]["quantity"]["packageCount"] = None
+        r = compare(self.target, alt, coverage={"complete": True})
+        self.assertFalse(r["alternatives"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", r["signals"])
+        missing_time = observation("NOTIME", 30)
+        del missing_time["source"]["observedAt"]
+        r = compare(self.target, missing_time, coverage={"complete": True})
+        self.assertFalse(r["alternatives"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", r["signals"])
+        self.assertTrue(any("timestamp" in gap for gap in r["gaps"]))
+
     def test_unconfirmed_quantity_no_conversion(self):
         a = observation("BADQ", 30, q=quantity(500, confirmed=False))
         self.assertEqual(compare(self.target, a)["alternatives"], [])
