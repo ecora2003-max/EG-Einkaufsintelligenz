@@ -220,13 +220,15 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
                               "; ".join(target_reasons))
     alternative_rows, other_days, rejected = [], [], []
     used = {target["observationId"]}
+    target_seen = False
     gaps = _coverage_gaps(coverage)
     for candidate in sorted(observations, key=lambda p: str(p.get("observationId", ""))):
         oid = candidate.get("observationId")
         if not oid:
             raise DomainError("observationId required")
         if oid in used:
-            if oid == target["observationId"]:
+            if oid == target["observationId"] and not target_seen:
+                target_seen = True
                 continue
             raise DomainError(f"duplicate observationId: {oid}")
         used.add(oid)
