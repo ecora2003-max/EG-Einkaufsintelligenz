@@ -133,6 +133,16 @@ class Comparisons(unittest.TestCase):
         self.assertEqual(r["signals"], [])
         self.assertEqual([x["observationId"] for x in r["otherDayOffers"]], ["FUTURE"])
 
+    def test_reference_or_stale_target_is_not_a_current_price(self):
+        ref = observation("REFERENCE_TARGET", 199, kind="REFERENCE_OLD")
+        with self.assertRaises(DomainError):
+            compare(ref, observation("CHEAPER", 100))
+        stale = observation("STALE_TARGET", 199, kind="LISTED_REGULAR",
+                            at="2026-10-01T10:00:00+02:00",
+                            start=None, until=None)
+        with self.assertRaises(DomainError):
+            compare(stale, observation("CHEAPER", 100))
+
     def test_old_price_and_historical_paid_not_current(self):
         old = observation("OLD", 30, kind="REFERENCE_OLD")
         paid = observation("PAID", 30, kind="HISTORICAL_PAID")
