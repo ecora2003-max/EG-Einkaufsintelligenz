@@ -455,6 +455,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
     funds = _integer(budget["amountCents"], "budget", 0) if budget_valid else None
     known_subtotal = 0
     rows, issues = [], []
+    free_capacity = dict(capacity) if isinstance(capacity, dict) else {}
     for need in sorted(needs_view.get("totals", []), key=lambda n: (n["foodTypeId"], n["unit"], n["basis"])):
         amount = _integer(need["quantityToBuy"], "need quantity", 1)
         offers = []
@@ -477,22 +478,25 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
         reasons = []
         due_dates = [_day(n["dueDate"]) for n in needs_view.get("needs", [])
                      if n["foodTypeId"] == need["foodTypeId"] and n["quantityToBuy"] > 0]
-        first_due = min(due_dates) if due_dates else None
+        last_due = max(due_dates) if due_dates else None
         shelf_days = selected.get("shelfLifeDays")
-        if shelf_days is None or first_due is None:
+        if shelf_days is None or last_due is None:
             reasons.append("shelf life or due date UNKNOWN")
-        elif _integer(shelf_days, "shelfLifeDays") < (first_due - today).days:
+        elif _integer(shelf_days, "shelfLifeDays") < (last_due - today).days:
             reasons.append("shelf life insufficient for planned use")
         storage = selected.get("storageClass")
         vol = selected.get("packageVolumeMl")
-        if not isinstance(capacity, dict) or storage not in capacity or vol is None:
+        if storage not in free_capacity or vol is None or free_capacity[storage] is None:
             reasons.append("available storage volume UNKNOWN")
-        elif capacity[storage] is None:
-            reasons.append("available storage volume UNKNOWN")
-        elif packs * _integer(vol, "packageVolumeMl", 1) > _integer(capacity[storage], "freeVolumeMl"):
-            reasons.append("insufficient confirmed storage volume")
-        if funds is None:
-            reasons.append("budget UNKNOWN")
+        else:
+            required_volume = packs * _integer(vol, "packageVolumeMl", 1)
+            remaining_volume = _integer(free_capacity[storage], "freeVolumeMl")
+            if required_volume > remaining_volume:
+                reasons.append("insufficient confirmed storage volume")
+            free_capacity[storage] = max(0, remaining_volume - required_volume)
+        if funds is None or (budget_valid and last_due is not None
+                             and last_due > _day(budget["periodEnd"])):
+            reasons.append("budget UNKNOWN or does not cover all needs")
         elif price > funds:
             reasons.append("budget exceeded")
         if funds is not None:
@@ -577,3 +581,29 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
                             allowed_stores=accessible_stores, historical=True)
     return {"status": "EVIDENCED_ALTERNATIVES" if result["alternatives"] else "NOT_PROVEN",
             "comparison": result, "noHindsight": True}
+
+
+def compare_catalog(observations: list[dict], shopping_date: str, *,
+                    as_of: str, coverage: dict | None = None,
+                    allowed_stores: dict | None = None) -> dict:
+    """Every eligible priced item is compared against every other snapshot item.
+
+    Noncomparable/unknown-price observations are reported as omitted targets,
+    never silently treated as zero. O(n^2), suitable for bounded app snapshots.
+    """
+    results, omitted = [], []
+    for target in sorted(observations, key=lambda o: o.get("observationId", "")):
+        if _rate(target) is None:
+            omitted.append({"observationId": target.get("observationId"),
+                            "reason": "unknown price or confirmed quantity"})
+            continue
+        accepted, reason = _valid(target, _day(shopping_date), _instant(as_of),
+                                  allowed_stores=allowed_stores)
+        if not accepted:
+            omitted.append({"observationId": target["observationId"],
+                            "reason": "; ".join(reason)})
+            continue
+        results.append(compare_prices(target, observations, shopping_date, as_of=as_of,
+                                      coverage=coverage, allowed_stores=allowed_stores))
+    return {"shoppingDate": shopping_date, "comparisons": results,
+            "omittedTargets": omitted, "sideEffects": []}
