@@ -140,58 +140,106 @@ def purchase_suggestion_envelope(item: dict, *,
                                  created_at: str, trace_id: str,
                                  suggestion_id: str, budget_period: dict | None = None,
                                  capacity_evidence: dict | None = None) -> dict:
-    """One price-evidence-aware purchase proposal, never a purchase command."""
+    """Typed ADR-017 package lines, with independently proved money components."""
     ids = _references(need_ids, "needIds", nonempty=True)
     _identifier(suggestion_id, "suggestionId")
-    if item.get("status") not in ("REVIEW", "FEASIBLE_NOT_PURCHASED"):
+    status = item.get("status", "UNKNOWN")
+    if status not in ("REVIEW", "FEASIBLE_NOT_PURCHASED"):
         status = "UNKNOWN"
-    else:
-        status = item["status"]
     mix = item.get("mix") or []
+    if not isinstance(mix, list):
+        raise DomainError("mix must be an array")
+    warnings = list(item.get("reasons") or item.get("warnings") or [])
     refs = _references([x["observationId"] for x in mix
                        if x.get("observationId") is not None], "observationRefs")
-    # A boolean flag alone is not evidence: every selected pack row must
-    # carry its own original observation ID for reproducibility.
     verified = (item.get("priceEvidenceVerified") is True and
                 bool(mix) and len(refs) == len(mix))
-    if not verified:
-        status = "REVIEW" if mix else "UNKNOWN"
-    pids = {x.get("productId") for x in mix}
-    single = len(mix) == 1 and len(pids) == 1
     total = item.get("quantityBought") if mix else None
     if total is not None and (type(total) is not int or total <= 0):
         raise DomainError("invalid quantityBought")
-    packs = mix[0]["packs"] if single else None
-    if packs is not None and (type(packs) is not int or packs <= 0):
-        raise DomainError("invalid package count")
+    lines = []
+    for entry in mix:
+        pid = _identifier(entry.get("productId"), "productId")
+        packs, qty = entry.get("packs"), entry.get("quantityBought")
+        if type(packs) is not int or packs <= 0 or type(qty) is not int or qty <= 0:
+            raise DomainError("pack quantity and packageCount must be positive integers")
+        obs_id = entry.get("observationId")
+        if obs_id is not None:
+            _identifier(obs_id, "observationId")
+        retailer = entry.get("retailerId")
+        store = entry.get("storeId")
+        if store is not None and not retailer:
+            raise DomainError("storeId without retailerId")
+        merchandise = entry.get("costCents")
+        deposit = entry.get("depositCents")
+        cash = entry.get("checkoutCents")
+        for name, cents in (("merchandiseCents", merchandise),
+                            ("depositCents", deposit), ("checkoutCents", cash)):
+            if cents is not None and (type(cents) is not int or cents < 0):
+                raise DomainError(f"{name}: nonnegative cents or null required")
+        if merchandise is not None and deposit is not None and cash is not None:
+            if merchandise + deposit != cash:
+                raise DomainError("package checkout does not equal merchandise plus deposit")
+        if cash is not None and (merchandise is None or deposit is None):
+            raise DomainError("package checkout requires known merchandise and deposit")
+        lines.append({"productId": pid, "observationId": obs_id,
+                      "packageCount": packs,
+                      "quantity": {"amount": qty, "unit": unit, "basis": basis,
+                                   "confirmed": True},
+                      "merchandiseCents": merchandise if obs_id else None,
+                      "depositCents": deposit if obs_id else None,
+                      "checkoutCents": cash if obs_id else None,
+                      "retailerId": retailer, "storeId": store})
+    if lines and total is not None and sum(x["quantity"]["amount"] for x in lines) != total:
+        raise DomainError("mixed-package quantities do not sum to total purchase quantity")
+    if lines and total is None:
+        raise DomainError("mixed-package total quantity required")
+    if any(x["observationId"] is None for x in lines):
+        verified = False
+    price_sum = (sum(x["merchandiseCents"] for x in lines)
+                 if lines and all(x["merchandiseCents"] is not None for x in lines)
+                 else None)
+    cash_sum = (sum(x["checkoutCents"] for x in lines)
+                if lines and all(x["checkoutCents"] is not None for x in lines)
+                else None)
+    if price_sum is None or price_sum != item.get("costCents"):
+        verified = False
+        warnings.append("unverified or inconsistent merchandise sum")
+    # Unknown deposit is different from zero; it prevents verified cash.
+    if cash_sum is None or cash_sum != item.get("checkoutCents"):
+        warnings.append("unverified or unknown deposit/checkout sum")
+    if not verified:
+        status = "REVIEW" if mix else "UNKNOWN"
+        warnings.append("price observation not verified")
+    if len(lines) > 1:
+        warnings.append("mixed packages: aggregate packageCount intentionally null")
+    single = len(lines) == 1
     if budget_period is not None:
-        if set(budget_period) != {"from", "until"} or _day(budget_period["from"]) > _day(budget_period["until"]):
+        if (set(budget_period) != {"from", "until"} or
+            _day(budget_period["from"]) > _day(budget_period["until"])):
             raise DomainError("invalid budgetPeriod")
     if capacity_evidence is not None and "snapshotAt" in capacity_evidence:
         _instant(capacity_evidence["snapshotAt"])
-    warnings = list(item.get("reasons") or item.get("warnings") or [])
-    if not verified:
-        warnings.append("price observation not verified")
-    if not single and mix:
-        warnings.append("mixed packages: packageCount is intentionally unknown")
     payload = {
         "suggestionId": suggestion_id, "needIds": ids,
-        "productId": next(iter(pids)) if single else None,
+        "productId": lines[0]["productId"] if single else None,
         "observationRefs": refs,
         "quantity": {"amount": total, "unit": unit, "basis": basis,
                      "confirmed": total is not None},
-        "packageCount": packs,
-        "expectedCents": item.get("costCents") if verified else None,
-        "checkoutCents": item.get("checkoutCents") if verified else None,
-        "budgetPeriod": budget_period,
-        "capacityEvidence": capacity_evidence,
+        "packageCount": lines[0]["packageCount"] if single else None,
+        "expectedCents": price_sum if verified else None,
+        "checkoutCents": cash_sum if verified and cash_sum is not None else None,
+        "budgetPeriod": budget_period, "capacityEvidence": capacity_evidence,
         "status": status, "warnings": sorted(set(warnings)),
         "termsVerified": None,
-        "mix": [dict(x) for x in mix],
-        "hasSideEffects": False
+        "packageLines": lines if lines else None,
+        "hasSideEffects": False,
     }
+    if not lines:
+        payload.pop("packageLines")
     return _envelope("shopping.purchase.suggestion", payload,
                      created_at=created_at, trace_id=trace_id)
+
 
 
 def offer_interest_envelope(result: dict, action: dict, *,
