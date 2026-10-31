@@ -448,67 +448,110 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
 def suggest_purchases(needs_view: dict, products: list[dict], *,
                       shopping_date: str, budget: dict | None = None,
                       capacity: dict | None = None) -> dict:
-    """Conservative package suggestions. No automatic buying or reservations."""
+    """Build conservative least-cost *known* mixed-pack proposals.
+
+    Optimization is exact per food type for bounded candidate sets, but NOT a
+    global multi-food routing/budget optimum. All results remain proposals.
+    """
+    from .pack_optimizer import PackSearchError, optimize_package_mix
+
     today = _day(shopping_date)
     budget_valid = (isinstance(budget, dict) and budget.get("amountCents") is not None
                     and _day(budget["periodStart"]) <= today <= _day(budget["periodEnd"]))
     funds = _integer(budget["amountCents"], "budget", 0) if budget_valid else None
     known_subtotal = 0
     rows, issues = [], []
-    free_capacity = dict(capacity) if isinstance(capacity, dict) else {}
-    for need in sorted(needs_view.get("totals", []), key=lambda n: (n["foodTypeId"], n["unit"], n["basis"])):
+    capacity_known = isinstance(capacity, dict)
+    free_capacity = dict(capacity) if capacity_known else None
+    for need in sorted(needs_view.get("totals", []),
+                       key=lambda n: (n["foodTypeId"], n["unit"], n["basis"])):
         amount = _integer(need["quantityToBuy"], "need quantity", 1)
+        due_dates = [_day(n["dueDate"]) for n in needs_view.get("needs", [])
+                     if n["foodTypeId"] == need["foodTypeId"] and
+                     n.get("unit", need["unit"]) == need["unit"] and
+                     n.get("basis", need["basis"]) == need["basis"] and
+                     n["quantityToBuy"] > 0]
+        last_due = max(due_dates).isoformat() if due_dates else None
         offers = []
+        uncertain_price = False
         for product in products:
             if product.get("foodTypeId") != need["foodTypeId"]:
                 continue
             q = _quantity(product.get("quantity"))
-            if q and q[1:] == (need["unit"], need["basis"]) and product.get("priceCents") is not None:
-                _integer(product["priceCents"], "priceCents")
-                offers.append((Fraction(product["priceCents"], q[0]), product["productId"], product, q))
+            if not q or q[1:] != (need["unit"], need["basis"]):
+                uncertain_price = True
+                continue
+            if product.get("priceCents") is None:
+                uncertain_price = True
+                continue
+            _integer(product["priceCents"], "priceCents")
+            offers.append({
+                "productId": product["productId"], "amount": q[0],
+                "priceCents": product["priceCents"],
+                "minPacks": product.get("minPacks", 1),
+                "maxPacks": product.get("maxPacks"),
+                "shelfLifeDays": product.get("shelfLifeDays"),
+                "storageClass": product.get("storageClass"),
+                "packageVolumeMl": product.get("packageVolumeMl"),
+                "priceKind": product.get("priceKind"),
+                "validFrom": product.get("validFrom"),
+                "validUntil": product.get("validUntil"),
+                "availability": product.get("availability"),
+                "conditional": product.get("conditional") or [],
+                "shippingCents": product.get("shippingCents"),
+            })
         if not offers:
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
                          "reason": "no comparable priced pack", "costCents": None})
             issues.append("total cost UNKNOWN")
             continue
-        _, _, selected, q = min(offers, key=lambda v: (v[0], v[1]))
-        packs = (amount + q[0] - 1) // q[0]
-        price = packs * selected["priceCents"]
+        try:
+            plan = optimize_package_mix(amount, offers, shopping_date=shopping_date,
+                          last_due_date=last_due, budget_cents=funds,
+                          capacity_ml=free_capacity)
+        except PackSearchError as ex:
+            raise DomainError(str(ex)) from ex
+        if plan["costCents"] is None:
+            rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
+                         "reason": plan["status"], "costCents": None,
+                         "warnings": plan["warnings"], "rejected": plan["rejected"]})
+            issues.append("total cost UNKNOWN")
+            continue
+        price = plan["costCents"]
         known_subtotal += price
-        reasons = []
-        due_dates = [_day(n["dueDate"]) for n in needs_view.get("needs", [])
-                     if n["foodTypeId"] == need["foodTypeId"] and n["quantityToBuy"] > 0]
-        last_due = max(due_dates) if due_dates else None
-        shelf_days = selected.get("shelfLifeDays")
-        if shelf_days is None or last_due is None:
-            reasons.append("shelf life or due date UNKNOWN")
-        elif _integer(shelf_days, "shelfLifeDays") < (last_due - today).days:
-            reasons.append("shelf life insufficient for planned use")
-        storage = selected.get("storageClass")
-        vol = selected.get("packageVolumeMl")
-        if storage not in free_capacity or vol is None or free_capacity[storage] is None:
-            reasons.append("available storage volume UNKNOWN")
-        else:
-            required_volume = packs * _integer(vol, "packageVolumeMl", 1)
-            remaining_volume = _integer(free_capacity[storage], "freeVolumeMl")
-            if required_volume > remaining_volume:
-                reasons.append("insufficient confirmed storage volume")
-            free_capacity[storage] = max(0, remaining_volume - required_volume)
-        if funds is None or (budget_valid and last_due is not None
-                             and last_due > _day(budget["periodEnd"])):
-            reasons.append("budget UNKNOWN or does not cover all needs")
-        elif price > funds:
-            reasons.append("budget exceeded")
         if funds is not None:
             funds -= price
-        rows.append({"foodTypeId": need["foodTypeId"], "productId": selected["productId"],
-                     "packs": packs, "quantityBought": packs * q[0], "costCents": price,
-                     "status": "REVIEW" if reasons else "FEASIBLE_NOT_PURCHASED",
-                     "reasons": reasons})
+        if free_capacity is not None:
+            for storage, used in plan.get("usedCapacityMl", {}).items():
+                if free_capacity.get(storage) is not None:
+                    free_capacity[storage] = max(0, free_capacity[storage] - used)
+        reasons = list(plan["warnings"])
+        if uncertain_price:
+            reasons.append("incomplete priced products for food type")
+        if budget_valid and last_due is not None and _day(last_due) > _day(budget["periodEnd"]):
+            reasons.append("budget period does not cover last demand")
+        mix = plan["items"]
+        row = {
+            "foodTypeId": need["foodTypeId"],
+            "productId": mix[0]["productId"] if len(mix) == 1 else None,
+            "packs": sum(item["packs"] for item in mix),
+            "mix": mix,
+            "quantityBought": plan["quantityBought"],
+            "costCents": price,
+            "status": ("FEASIBLE_NOT_PURCHASED" if plan["status"] ==
+                       "FEASIBLE_NOT_PURCHASED" and not reasons else "REVIEW"),
+            "reasons": sorted(set(reasons)),
+            "optimalityProven": plan["optimalityProven"],
+            "optimizationScope": plan["scope"],
+            "rejectedCandidates": plan["rejected"],
+        }
+        rows.append(row)
     return {"items": rows, "knownSubtotalCents": known_subtotal,
-            "totalCostCents": known_subtotal if all("costCents" in r and r["costCents"] is not None for r in rows) else None,
-            "budgetRemainingCents": funds, "issues": sorted(set(issues)), "sideEffects": []}
-
+            "totalCostCents": (known_subtotal if all(r.get("costCents") is not None for r in rows)
+                               else None),
+            "budgetRemainingCents": funds, "issues": sorted(set(issues)),
+            "optimizationScope": "PER_FOODTYPE_SEQUENTIAL",
+            "sideEffects": []}
 
 ACTIONS = {"INTERESTED", "UNDECIDED", "NOT_TODAY", "HIDE_PRODUCT", "HIDE_FOOD_TYPE",
            "ADD_TO_SHOPPING_LIST"}
