@@ -640,7 +640,18 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             reasons.append("incomplete priced products for food type")
         if budget_valid and last_due is not None and _day(last_due) > _day(budget["periodEnd"]):
             reasons.append("budget period does not cover last demand")
-        mix = plan["items"]
+        mix = []
+        for item in plan["items"]:
+            p = product_by_id[item["productId"]]
+            evidence = p.get("priceObservation")
+            entry = {"productId": p["productId"], "packs": item["packs"],
+                     "quantityBought": item["quantityBought"],
+                     "costCents": item["packs"] * p["priceCents"]}
+            if isinstance(evidence, dict):
+                entry["observationId"] = evidence.get("observationId")
+                entry["retailerId"] = (evidence.get("scope") or {}).get("retailerId")
+                entry["storeId"] = (evidence.get("scope") or {}).get("storeId")
+            mix.append(entry)
         rows.append({
             "foodTypeId": need["foodTypeId"],
             "productId": mix[0]["productId"] if len(mix) == 1 else None,
