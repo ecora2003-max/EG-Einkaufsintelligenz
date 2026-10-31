@@ -169,12 +169,17 @@ class RetailerAndRightsGates(unittest.TestCase):
     def test_own_receipt_is_private_history_not_current_price(self):
         purchase = obs(kind="HISTORICAL_PAID", retailer="PENNY")
         purchase["confirmed"] = True
+        purchase["purchaseAt"] = NOW
         purchase["source"]["evidenceKind"] = "USER_CONFIRMED_RECEIPT"
         self.assertTrue(source_gate(purchase,
                                     usage_context="PRIVATE_USER_HISTORY")[0])
         self.assertFalse(source_gate(purchase, usage_context="APP_DISPLAY",
                                      rights_grants=grant(retailer="PENNY"))[0])
         self.assertFalse(source_gate(dict(purchase, confirmed=False),
+                                     usage_context="PRIVATE_USER_HISTORY")[0])
+        self.assertFalse(source_gate(dict(purchase, purchaseAt=None),
+                                     usage_context="PRIVATE_USER_HISTORY")[0])
+        self.assertFalse(source_gate(dict(purchase, purchaseAt="not-a-date"),
                                      usage_context="PRIVATE_USER_HISTORY")[0])
 
     def test_historical_alternatives_respect_display_rights(self):
@@ -233,6 +238,13 @@ class RetailerAndRightsGates(unittest.TestCase):
                       "rightsGrants": grant()})
         with self.assertRaises(DomainError):
             dispatch({"operation": "comparePrices", "rightsGrants": grant()})
+
+    def test_host_grant_mode_must_be_typed_list_not_substring(self):
+        misformed = grant()
+        misformed["official-synthetic-rewe"]["acquisitionModes"] = (
+            "PUBLISHED_OFFER_COLLECTION")
+        self.assertFalse(source_gate(obs(), usage_context="APP_DISPLAY",
+                                     rights_grants=misformed)[0])
 
     def test_unknown_usage_context_is_rejected(self):
         with self.assertRaises(DomainError):
