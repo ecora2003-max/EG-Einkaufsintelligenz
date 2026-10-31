@@ -162,6 +162,59 @@ class MixedPackaging(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertEqual(arr, old)
 
+    def test_missing_source_and_deposit_never_claims_cash_budget(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500, "dueDate": DATE}]}
+        bare = {"productId": "P", "foodTypeId": "oats", "quantity": base_q(500),
+                "priceCents": 120, "shelfLifeDays": 30,
+                "storageClass": "DRY", "packageVolumeMl": 800}
+        budget = {"amountCents": 200, "periodStart": DATE, "periodEnd": DATE}
+        r = suggest_purchases(view, [bare], shopping_date=DATE,
+                              budget=budget, capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["status"], "REVIEW")
+        self.assertIsNone(r["items"][0]["checkoutCents"])
+        self.assertIsNone(r["totalCheckoutCents"])
+        self.assertIsNone(r["budgetRemainingCents"])
+        self.assertEqual(r["knownSubtotalCents"], 120)
+
+    def test_deposit_cash_counts_against_budget(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500, "dueDate": DATE}]}
+        p = with_evidence({"productId": "P", "foodTypeId": "oats",
+                           "quantity": base_q(500), "priceCents": 120,
+                           "shelfLifeDays": 30, "storageClass": "DRY",
+                           "packageVolumeMl": 800})
+        p["depositCents"] = 25
+        p["priceObservation"]["depositCents"] = 25
+        budget = {"amountCents": 140, "periodStart": DATE, "periodEnd": DATE}
+        r = suggest_purchases(view, [p], shopping_date=DATE,
+                              as_of="2026-10-31T15:00:00+01:00",
+                              budget=budget, capacity={"DRY": 1000})
+        self.assertEqual(r["totalCostCents"], 120)
+        self.assertEqual(r["totalCheckoutCents"], 145)
+        self.assertEqual(r["budgetRemainingCents"], -5)
+        self.assertEqual(r["items"][0]["status"], "REVIEW")
+        self.assertIn("checkout cash budget exceeded", r["items"][0]["reasons"])
+
+    def test_stale_observation_forces_review(self):
+        view = {"totals": [{"foodTypeId": "oats", "quantityToBuy": 500,
+                            "unit": "g", "basis": "NET"}],
+                "needs": [{"foodTypeId": "oats", "quantityToBuy": 500, "dueDate": DATE}]}
+        p = with_evidence({"productId": "P", "foodTypeId": "oats",
+                           "quantity": base_q(500), "priceCents": 120,
+                           "shelfLifeDays": 30, "storageClass": "DRY",
+                           "packageVolumeMl": 800})
+        p["priceObservation"]["validFrom"] = "2026-10-01"
+        p["priceObservation"]["validUntil"] = "2026-10-15"
+        budget = {"amountCents": 200, "periodStart": DATE, "periodEnd": DATE}
+        r = suggest_purchases(view, [p], shopping_date=DATE,
+                              as_of="2026-10-31T15:00:00+01:00",
+                              budget=budget, capacity={"DRY": 1000})
+        self.assertEqual(r["items"][0]["status"], "REVIEW")
+        self.assertIn("not valid on shopping date", r["items"][0]["reasons"])
+
     def test_suggest_purchase_mix_and_budget_after_allocation(self):
         view = {
             "totals": [{"foodTypeId": "oats", "quantityToBuy": 1500,
