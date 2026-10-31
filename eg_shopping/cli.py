@@ -42,7 +42,8 @@ def dispatch(message: dict) -> dict | list:
             storage_class=message.get("storageClass"),
             package_volume_ml=message.get("packageVolumeMl"),
             future_price=message.get("futurePrice"),
-            accessible_stores=message.get("accessibleStores"))
+            accessible_stores=message.get("accessibleStores"),
+            usage_context=message.get("usageContext", "RESEARCH_ONLY"))
     if op == "projectNeeds":
         return project_needs(message["snapshot"], tuple(message.get("horizons", (1, 7, 28, 56))))
     if op == "suggestPurchases":
@@ -54,7 +55,8 @@ def dispatch(message: dict) -> dict | list:
     if op == "evaluatePastPurchase":
         return evaluate_past_purchase(message["purchase"], message["historicalPrices"],
                    accessible_stores=message["accessibleStores"],
-                   coverage=message.get("coverage"))
+                   coverage=message.get("coverage"),
+                   usage_context=message.get("usageContext", "RESEARCH_ONLY"))
     if op == "evaluateOfferInterest":
         return evaluate_offer_interest(message["state"], message["action"])
     if op == "listOfferInterests":
