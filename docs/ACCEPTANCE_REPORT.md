@@ -1,6 +1,6 @@
 # Abnahmeprotokoll – Offline-Fachkern (31.10.2026)
 
-**Vertrag:** `EG-Architecture 1.0.0-draft`, zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`. Kein Produktions-/Händler-API-/Android-Test. **Letzter belegter Test:** GitHub Actions https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221439003, PR-Merge `a7f8074` gegen main `66f3f43133795f5a40d6fc350ffaa8cab65d6676`, **78 bestanden / 0 fehlgeschlagen / 0 übersprungen**.
+**Vertrag:** `EG-Architecture 1.0.0-draft`, zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`. Kein Produktions-/Händler-API-/Android-Test. **Letzter belegter Test:** GitHub Actions https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221646056, PR-Merge `ebde5c7` gegen main `4593b195860432426c878d8535b969f05f779db7`, **82 bestanden / 0 fehlgeschlagen / 0 übersprungen**.
 
 ```bash
 python -m pip install 'jsonschema[format]==4.23.0'
@@ -35,3 +35,5 @@ Weitere nachgewiesene Tests: Acht-Händler-Katalog mit regulären Preisen, FEFO 
 ## Integrationsgrenzen
 
 Die Engine arbeitet offline auf standardisierten Daten-Snapshots. **Keine** API-Abdeckung, Live-Händlerverfügbarkeit, Nutzungsrechte fremder Webseiten, fehlerfreie Kamera-/Android-Migration oder globale Einkaufsrouten-Optimierung ist damit bewiesen. Eine reine Python-Referenz mit dokumentiertem Kotlin-Migrationspfad ist mit dem Architekturentwurf vereinbar; `INTEGRATED` darf nur Codex nach realer App-Integration und Prüfung setzen. Erweiterte Interessen-/Nachkauf-DTOs sind noch als Änderungsantrag dokumentiert, kein freigegebener neuer gemeinsamer Vertrag.
+
+**Zusätzlicher CLI-End-to-End-Nachweis:** `tests/test_cli.py` prüft das dokumentierte Input-JSON gegen einen echten `python -m eg_shopping`-Prozess, negative CLI-Fehler mit Exit 2 sowie seiteneffektfreie Bedarfsberechnung. Kotlin-Portspezifikation: `docs/KOTLIN_MIGRATION_SPEC.md`. Diese beiden Prüfungen ergänzen die 18 Pflichtszenarien, ersetzen keine Geräte-/App-Tests.
