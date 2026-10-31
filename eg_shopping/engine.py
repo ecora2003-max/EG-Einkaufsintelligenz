@@ -659,9 +659,14 @@ def evaluate_offer_interest(state: dict, action: dict) -> dict:
 
 
 def list_offer_interests(observations: list[dict], state: dict, shopping_date: str, *,
-                         as_of: str, preferred_retailers: list[str] | None = None) -> list[dict]:
+                         as_of: str, preferred_retailers: list[str] | None = None,
+                         preferred_food_types: list[str] | None = None,
+                         walking_distance_by_store_m: dict[str, int] | None = None,
+                         max_walking_distance_m: int | None = None) -> list[dict]:
     """Deduplicate same product across retailers, retaining alternate retailer IDs."""
     day, cutoff = _day(shopping_date), _instant(as_of)
+    if max_walking_distance_m is not None:
+        _integer(max_walking_distance_m, "maxWalkingDistanceM")
     groups = defaultdict(list)
     for obs in observations:
         a = obs.get("article", {})
@@ -670,6 +675,14 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
             continue
         if a.get("foodTypeId") in state.get("hiddenFoodTypes", []):
             continue
+        if preferred_food_types is not None and a.get("foodTypeId") not in preferred_food_types:
+            continue
+        if max_walking_distance_m is not None:
+            scope = obs.get("scope", {})
+            key = scope.get("retailerId", "") + "/" + (scope.get("storeId") or "")
+            meters = (walking_distance_by_store_m or {}).get(key)
+            if meters is None or _integer(meters, "walkingDistanceMeters") > max_walking_distance_m:
+                continue
         if preferred_retailers is not None and obs.get("scope", {}).get("retailerId") not in preferred_retailers:
             continue
         ok, _ = _valid(obs, day, cutoff)
