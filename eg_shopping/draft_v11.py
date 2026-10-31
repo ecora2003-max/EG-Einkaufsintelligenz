@@ -148,8 +148,11 @@ def purchase_suggestion_envelope(item: dict, *,
     mix = item.get("mix") or []
     refs = _references([x["observationId"] for x in mix
                        if x.get("observationId") is not None], "observationRefs")
-    verified = item.get("priceEvidenceVerified") is True
-    if not verified or not refs:
+    # A boolean flag alone is not evidence: every selected pack row must
+    # carry its own original observation ID for reproducibility.
+    verified = (item.get("priceEvidenceVerified") is True and
+                bool(mix) and len(refs) == len(mix))
+    if not verified:
         status = "REVIEW" if mix else "UNKNOWN"
     pids = {x.get("productId") for x in mix}
     single = len(mix) == 1 and len(pids) == 1
