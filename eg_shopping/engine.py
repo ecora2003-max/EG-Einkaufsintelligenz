@@ -637,6 +637,17 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             checkout_complete = False
             merchandise_complete = False
             continue
+        if usage_context == "APP_DISPLAY" and not verified_offers:
+            rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
+                         "reason": "no authorized price observation for APP_DISPLAY",
+                         "reasons": ["no authorized price observation for APP_DISPLAY"],
+                         "costCents": None, "checkoutCents": None,
+                         "mix": [], "priceEvidenceVerified": False})
+            issues.append("authorized price/checkout totals UNKNOWN")
+            checkout_complete = False
+            merchandise_complete = False
+            funds = None
+            continue
         try:
             plan = optimize_package_mix(amount, verified_offers or offers,
                           shopping_date=shopping_date, last_due_date=last_due,
