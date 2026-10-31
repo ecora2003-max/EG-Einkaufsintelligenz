@@ -1,5 +1,6 @@
 # Offline-Testausführung
 
-Tests: `python -m pip install 'jsonschema[format]==4.23.0' && python -m unittest discover -s tests -v`.
+`python -m pip install 'jsonschema[format]==4.23.0'`
+`python -m unittest discover -s tests -v`
 
-Testlauf zum aktuellen main einschließlich der neuen Null-Pfand-Regressionsprüfung.
+Prüfung: aktueller main einschließlich Null-Mengenbasis/Quellzeitpunkt und Cash-Kosten.
