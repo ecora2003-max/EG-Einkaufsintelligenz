@@ -14,7 +14,7 @@
 
 ## Verifizierte Tests
 
-**GitHub Actions PR #1, aktuell grün:** https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220132440  
+**Historischer GitHub-Actions-Testlauf (früherer Stand):** https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41220132440  
 **Geprüfter Head:** `20adc0685b33562b1170aaf36fa724e8d856a8d1` (PR-Merge-Commit `894d580`, main-Basis `9518b7a69c8b7e5dd6ecea3d4676823c620c9155`) (PR-Merge-Checkout inkl. vorangegangener `main`-Änderungen).  
 **Runner:** Python 3.12.15 auf Ubuntu.  
 **Kommandos:**
@@ -24,7 +24,7 @@ python -m unittest discover -s tests -v
 ```
 **Ergebnis:** 62 Tests / **62 bestanden, 0 fehlgeschlagen, 0 übersprungen**, darunter formale Validierung der Architektur-Beispielnachrichten und `comparison.result`. Logs belegen dieses Ergebnis. Vorheriger CI-Lauf mit einem Testproblem (Formatvalidierung; nicht-failendes Invalidbeispiel) war **fehlgeschlagen** und wurde durch stärkere Negativprobe und Installation `jsonschema[format]` korrigiert. Weitere Commits nach diesem Lauf (Dokumentation) sind noch auf neuen CI-Status zu prüfen; der zuvor bestandene Testlauf belegt nicht jede spätere Codeänderung.
 
-## Noch offene Punkte, keine unbelegte Vollständigkeitsmeldung
+## Historische offene Punkte (neuester Status am Dokumentende maßgeblich)
 
 1. **Konditionale Preise und Staffel-/Mehrfachkaufoptimierung:** Bisher werden Coupons/Mitgliedschaft/Mindestmengen konservativ ausgeschlossen; kein Erfüllungsnachweis aus gesondertem Bedingungen-DTO.
 2. **Einkaufsoptimierung:** Exakte begrenzte Mischgebindesuche mit `max_nodes=250000`, bis zu acht Varianten pro FoodType (`pack_optimizer.py`); jedoch keine globale Optimierung über mehrere FoodTypes, Distanz-/Laufwegen, Shop-Splitting, Gesamtbudget, Mindestmengen und Verderbsmaximierung. Die aktuelle Packungsauswahl kann teurer als eine andere Packungs-Mischung sein.
@@ -64,3 +64,18 @@ CI https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221288
 **Abnahmestatus: READY_FOR_INTEGRATION (nur deterministischer, rein offline arbeitender Referenzkern)**. Alle 18 individuellen Pflichtszenarien sind durch ausgeführte Tests belegt, Zuordnung in `docs/ACCEPTANCE_REPORT.md`. Aktuelle CI https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221646056 : 82/82 Pass, 0 Fail, 0 Skip, getestet main `4593b195860432426c878d8535b969f05f779db7` im PR-Merge `ebde5c7`, Python 3.12, Befehl `python -m pip install 'jsonschema[format]==4.23.0'` und `python -m unittest discover -s tests -v`. Vergleich, Einkauf, Bedarfsprognose, Angebotsinteresse, historischer Kauf, nachgewiesene Angebotsvorverlegung, CLI und Schema-Export sind offline lauffähig. End-to-End-CLI mit synthetischen JSON-Dateien getestet. Genaue Kotlin-Portierung beschrieben in `docs/KOTLIN_MIGRATION_SPEC.md`.
 
 **Freigabegrenze:** Dieser Status gilt nicht fuer reale Supermarkt-Datenbeschaffung, Filialpreise, Lizenzrechte, Live-APIs, Android-Installation, Room/Compose-Oberflaechen, Migrations- oder Geraetetests. Architektur-Contract bleibt `1.0.0-draft`. Nachzuziehende App-Integration und abweichende Vertragsfreigaben bleiben Codex/Architektursteuerung vorbehalten. Keine Nutzer- oder Lagerbuchung im Modul. Optionale Weiterentwicklungen (globale Laden-/Warenkorbroute, Coupon-Kombinationen, Retouren-Pfand) sind keine behaupteten bestehenden Faehigkeiten. Ab jetzt nur bei Regression, freigegebener Vertragsaenderung oder neuer Anforderung weiterentwickeln; sonst offline als uebergabereif belassen.
+
+## Wiederaufnahme- und Testnachweis 31.10.2026 – erneute unabhängige Prüfung
+
+Aktueller Status: `READY_FOR_INTEGRATION` nur für den deterministischen Offline-Referenzkern; weder Live-Quellrechte noch Haupt-App-Integration sind freigegeben. Eigene Architekturdateien bleiben unverändert, Vertrag `1.0.0-draft`, Architektur SHA `d22862739bd0e3ef8451ce029e54f7c33ee53e40`.
+
+**Neu implementierte Korrekturen:** Angebote eines identischen `productId` verschiedener Supermärkte werden über eindeutige `priceObservation.observationId` getrennt verarbeitet und nach Filiale/Händler ausgewiesen. Konservativer Check der Preisquellen, Bio-/GTIN-/Variantenattribute, Produkt-/Quellenbedingungen, Marktscope, Preisart und Gültigkeit. Bei nicht belegtem Preis sind Cash-Checkout, verifizierte Gesamtkosten und verbleibender Etat `null`; nur separate geschätzte Checkout-Kosten können angezeigt werden. Für belegte Angebote ist die Budgetgrenze auf Warenpreis **plus Pfand** bezogen. Reguläre Tagespreise werden anhand Europe/Berlin eingeordnet; kettenweiter statt belegter lokaler Preis erzeugt Grau, unbekannte Filiale ist kein sicherer Einkaufspunkt. Doppelte IDs und Quellenzeitpunkte nach Entscheidung lösen keinen falschen positiven Preisbeweis aus.
+
+**Echte CI-Evidenz:** Der erste Prüflauf [41222176171](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222176171) umfasste 85 Tests und scheiterte mit 2 Fehlern; beide behoben. Der nächste Lauf [41222463623](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222463623) bestand 89/89. Letzter fachlicher Testlauf [41222789227](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222789227): **92 bestanden, 0 fehlgeschlagen, 0 übersprungen**, Python 3.12 / Ubuntu. PR-Merge-Checkout `571a9c7` auf Basis des Fachcode-Commits `1373cac61f7ec8b41fe505044cdb2e4409df6974`. PR #3 wurde anschließend erfolgreich ins eigene Repo gemergt (Merge-SHA `739da6b657b12330adcb7e844892d1e617acc516`); seither nur Dokumentation verändert. Prüfkommandos:
+
+```bash
+python -m pip install 'jsonschema[format]==4.23.0'
+python -m unittest discover -s tests -v
+```
+
+**Offene Integrations- und Qualitätsgrenzen:** Keine belegte Live-Abdeckung sämtlicher Filialen oder Nutzungsrechte, keine garantierte Liefer-/Regalverfügbarkeit, keine global optimierte Mehr-FoodType-Route, keine vollständige Coupon-/Versandkosten- oder Pfandrückgabeoptimierung. Noch kein Kotlin-Port, kein Room/Compose-/Android-Integrationstest; `INTEGRATED` bleibt Codex vorbehalten. Bei erneuter Aktivierung erst AGENTS/ACCEPTANCE/STATUS und Architektur sowie aktuelle GitHub-Actions-Logs lesen und **nur bei neuer Anforderung, Regression oder neuer freigegebener Vertragsversion** den bereits abgenommenen Offline-Kern ändern. Neue Implementierungen ausschließlich im eigenen Schreibrepo, alle Tests erneut ausführen und diesen Abschnitt aktualisieren.
