@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 from math import ceil
 from typing import Any
 
+from .source_policy import gate_observation, private_receipt_verified
+
 CONTRACT_VERSION = "1.0.0-draft"
 SIGNALS = ("RED_SAME_BIO_CHEAPER", "ORANGE_DIFFERENT_BIO_CHEAPER", "GREY_MAY_BE_CHEAPER")
 PRICE_KINDS = {"SALE", "CURRENT_DISPLAYED", "LISTED_REGULAR", "REFERENCE_OLD",
@@ -110,7 +112,11 @@ def _scope_ok(obs: dict, allowed_stores: dict | None, strict: bool) -> tuple[boo
 
 
 def _valid(obs: dict, shopping_date: date, as_of: datetime, historical: bool = False,
-           allow_online: bool = False, allowed_stores: dict | None = None) -> tuple[bool, list[str]]:
+           allow_online: bool = False, allowed_stores: dict | None = None,
+           usage_context: str = "RESEARCH_ONLY") -> tuple[bool, list[str]]:
+    permitted, reasons = gate_observation(obs, usage_context)
+    if not permitted:
+        return False, reasons
     kind = obs.get("priceKind")
     if kind not in PRICE_KINDS:
         return False, ["unrecognized price kind"]
@@ -199,7 +205,7 @@ def _coverage_gaps(coverage: dict | None) -> list[str]:
 def compare_prices(target: dict, observations: list[dict], shopping_date: str, *,
                    as_of: str, coverage: dict | None = None, matches: list[dict] | None = None,
                    allowed_stores: dict | None = None, allow_online: bool = False,
-                   historical: bool = False) -> dict:
+                   historical: bool = False, usage_context: str = "RESEARCH_ONLY") -> dict:
     """Compare exact rational unit rates; emit v1 draft comparison.result payload.
 
     'as_of' is the evidence cutoff, not a wall-clock read. If coverage is not
@@ -210,11 +216,18 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
         raise DomainError("target and observations required")
     if not target.get("observationId"):
         raise DomainError("target.observationId required")
+    if historical and usage_context == "PRIVATE_USER_HISTORY" and not private_receipt_verified(target):
+        raise DomainError("private receipt confirmation/local identity missing")
+    if not historical:
+        permitted, reasons = gate_observation(target, usage_context)
+        if not permitted:
+            raise DomainError("target excluded by usage policy: " + "; ".join(reasons))
     target_rate = _rate(target)
     if target_rate is None:
         raise DomainError("target price and confirmed comparable quantity required")
     if not historical:
-        target_ok, target_reasons = _valid(target, day, cutoff)
+        target_ok, target_reasons = _valid(target, day, cutoff,
+                                            usage_context=usage_context)
         if not target_ok:
             raise DomainError("target is not a proven price for shopping date: " +
                               "; ".join(target_reasons))
@@ -232,14 +245,15 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
                 continue
             raise DomainError(f"duplicate observationId: {oid}")
         used.add(oid)
-        valid, caveats = _valid(candidate, day, cutoff, historical, allow_online, allowed_stores)
+        valid, caveats = _valid(candidate, day, cutoff, historical, allow_online,
+                                allowed_stores, usage_context=usage_context)
         if not valid:
             reason = "; ".join(caveats)
             rejected.append({"observationId": oid, "reason": reason})
             if reason == "not valid on shopping date" and candidate.get("priceKind") == "SALE":
                 other_days.append({"observationId": oid, "validFrom": candidate.get("validFrom"),
                                    "validUntil": candidate.get("validUntil")})
-            if any(token in reason for token in ("unknown", "incomplete", "unverified", "proof", "observed after decision time")):
+            if any(token in reason for token in ("unknown", "incomplete", "unverified", "restricted", "disallowed", "permission", "proof", "observed after decision time")):
                 gaps.append(f"{oid}: {reason}")
             continue
         gaps.extend(f"{oid}: {note}" for note in caveats)
@@ -324,14 +338,18 @@ def compare_prices(target: dict, observations: list[dict], shopping_date: str, *
             "bestPriceClaim": "CHEAPEST_KNOWN_MATCHING_ONLY"}
 
 
-def comparison_envelope(result: dict, *, created_at: str, trace_id: str) -> dict:
+def comparison_envelope(result: dict, *, created_at: str, trace_id: str,
+                        usage_context: str = "RESEARCH_ONLY") -> dict:
     """Schema-compatible message; extras within payload are optional."""
     _instant(created_at)
     if not trace_id:
         raise DomainError("traceId required")
+    meta = {"producer": "eg-einkaufsintelligenz", "createdAt": created_at,
+            "traceId": trace_id}
+    if usage_context != "RESEARCH_ONLY":
+        meta["usageContext"] = usage_context
     return {"contractVersion": CONTRACT_VERSION, "messageType": "comparison.result",
-            "meta": {"producer": "eg-einkaufsintelligenz", "createdAt": created_at,
-                     "traceId": trace_id}, "payload": result}
+            "meta": meta, "payload": result}
 
 
 def _need_qty(row: dict) -> tuple[int, str, str] | None:
@@ -477,7 +495,8 @@ def project_needs(snapshot: dict, horizons: tuple[int, ...] = (1, 7, 28, 56)) ->
 
 def suggest_purchases(needs_view: dict, products: list[dict], *,
                       shopping_date: str, budget: dict | None = None,
-                      capacity: dict | None = None, as_of: str | None = None) -> dict:
+                      capacity: dict | None = None, as_of: str | None = None,
+                      usage_context: str = "RESEARCH_ONLY") -> dict:
     """Suggest mixed packs without turning missing price/deposit evidence into certainty.
 
     CostCents is merchandise only; checkout includes known per-pack deposit.
@@ -489,6 +508,16 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
 
     today = _day(shopping_date)
     cutoff = _instant(as_of) if as_of is not None else None
+    policy_gaps = []
+    if usage_context != "RESEARCH_ONLY":
+        filtered = []
+        for product in products:
+            permitted, _ = gate_observation(product.get("priceObservation"), usage_context)
+            if permitted:
+                filtered.append(product)
+            else:
+                policy_gaps.append(f"{product.get('productId', 'UNKNOWN')}: price excluded by usage/retailer policy")
+        products = filtered
     budget_valid = (isinstance(budget, dict) and budget.get("amountCents") is not None
                     and _day(budget["periodStart"]) <= today <= _day(budget["periodEnd"]))
     funds = _integer(budget["amountCents"], "budget", 0) if budget_valid else None
@@ -698,7 +727,7 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             "optimizationScope": plan["scope"],
             "rejectedCandidates": plan["rejected"],
         })
-    return {"items": rows, "knownSubtotalCents": known_subtotal,
+    result = {"items": rows, "knownSubtotalCents": known_subtotal,
             "totalCostCents": (known_subtotal if merchandise_complete and
                                all(r.get("costCents") is not None for r in rows)
                                else None),
@@ -707,6 +736,10 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
             "budgetRemainingCents": funds, "issues": sorted(set(issues)),
             "optimizationScope": "PER_FOODTYPE_SEQUENTIAL",
             "sideEffects": []}
+    if usage_context != "RESEARCH_ONLY":
+        result.update({"incomplete": bool(policy_gaps), "gaps": sorted(set(policy_gaps)),
+                       "signals": [SIGNALS[2]] if policy_gaps else []})
+    return result
 
 ACTIONS = {"INTERESTED", "UNDECIDED", "NOT_TODAY", "HIDE_PRODUCT", "HIDE_FOOD_TYPE",
            "ADD_TO_SHOPPING_LIST"}
@@ -741,13 +774,19 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
                          as_of: str, preferred_retailers: list[str] | None = None,
                          preferred_food_types: list[str] | None = None,
                          walking_distance_by_store_m: dict[str, int] | None = None,
-                         max_walking_distance_m: int | None = None) -> list[dict]:
+                         max_walking_distance_m: int | None = None,
+                         usage_context: str = "RESEARCH_ONLY") -> list[dict] | dict:
     """Deduplicate same product across retailers, retaining alternate retailer IDs."""
     day, cutoff = _day(shopping_date), _instant(as_of)
     if max_walking_distance_m is not None:
         _integer(max_walking_distance_m, "maxWalkingDistanceM")
     groups = defaultdict(list)
+    policy_gaps = []
     for obs in observations:
+        permitted, _ = gate_observation(obs, usage_context)
+        if not permitted:
+            policy_gaps.append(f"{obs.get('observationId', 'UNKNOWN')}: offer excluded by policy")
+            continue
         a = obs.get("article", {})
         product = a.get("gtin") or a.get("productId")
         if not product or product in state.get("hiddenProducts", []):
@@ -764,7 +803,7 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
                 continue
         if preferred_retailers is not None and obs.get("scope", {}).get("retailerId") not in preferred_retailers:
             continue
-        ok, _ = _valid(obs, day, cutoff)
+        ok, _ = _valid(obs, day, cutoff, usage_context=usage_context)
         if ok and obs["priceKind"] == "SALE":
             priced = _rate(obs)
             if priced:
@@ -775,17 +814,25 @@ def list_offer_interests(observations: list[dict], state: dict, shopping_date: s
         results.append({"productId": product, "bestKnownObservationId": arr[0][1],
                         "otherObservationIds": [x[1] for x in arr[1:]],
                         "status": state.get("interests", {}).get(product, "UNDECIDED")})
+    if usage_context != "RESEARCH_ONLY":
+        return {"items": results, "incomplete": bool(policy_gaps),
+                "gaps": sorted(set(policy_gaps)),
+                "signals": [SIGNALS[2]] if policy_gaps else []}
     return results
 
 
 def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
-                           accessible_stores: dict, coverage: dict | None = None) -> dict:
+                           accessible_stores: dict, coverage: dict | None = None,
+                           usage_context: str = "RESEARCH_ONLY") -> dict:
     """Prove actual past purchase savings, not just cheaper unit prices.
 
     Buying one larger multipack may have a lower rate but a higher minimum
     checkout. Those are disclosed as unit-only comparisons, NEVER asserted
     past money saved. Refundable deposit is separately unknown if missing.
     """
+    if usage_context == "PRIVATE_USER_HISTORY" and not private_receipt_verified(purchase):
+        return {"status": "UNKNOWN", "reason": "private receipt not confirmed/local",
+                "comparison": None, "sideEffects": []}
     if purchase.get("confirmed") is not True or not purchase.get("purchaseAt"):
         return {"status": "UNKNOWN", "reason": "confirmed purchase timestamp missing",
                 "comparison": None}
@@ -794,7 +841,8 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
         raise DomainError("purchase must carry HISTORICAL_PAID priceKind")
     result = compare_prices(purchase, historical_prices, when.date().isoformat(),
                             as_of=purchase["purchaseAt"], coverage=coverage,
-                            allowed_stores=accessible_stores, historical=True)
+                            allowed_stores=accessible_stores, historical=True,
+                            usage_context=usage_context)
     target_qty = _quantity(purchase.get("article", {}).get("quantity"))
     if target_qty is None:
         raise DomainError("confirmed historical purchase quantity required")
@@ -841,13 +889,22 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
     result["signals"] = signals
     savings = [p["historicalMerchandiseSavingsCents"] for p in payable]
     result["bestProvenMerchandiseSavingCents"] = max(savings) if savings else None
-    return {"status": "EVIDENCED_ALTERNATIVES" if payable else "NOT_PROVEN",
-            "comparison": result, "noHindsight": True}
+    output = {"status": "EVIDENCED_ALTERNATIVES" if payable else "NOT_PROVEN",
+              "comparison": result, "noHindsight": True}
+    if usage_context == "PRIVATE_USER_HISTORY":
+        output["historicalPaid"] = {
+            "receiptId": purchase["receiptId"], "receiptLineId": purchase["receiptLineId"],
+            "priceCents": purchase["priceCents"],
+            "retailerId": (purchase.get("scope") or {}).get("retailerId"),
+            "purchaseAt": purchase["purchaseAt"], "priceKind": "HISTORICAL_PAID"}
+        output["sideEffects"] = []
+    return output
 
 
 def compare_catalog(observations: list[dict], shopping_date: str, *,
                     as_of: str, coverage: dict | None = None,
-                    allowed_stores: dict | None = None) -> dict:
+                    allowed_stores: dict | None = None,
+                    usage_context: str = "RESEARCH_ONLY") -> dict:
     """Every eligible priced item is compared against every other snapshot item.
 
     Noncomparable/unknown-price observations are reported as omitted targets,
@@ -855,17 +912,30 @@ def compare_catalog(observations: list[dict], shopping_date: str, *,
     """
     results, omitted = [], []
     for target in sorted(observations, key=lambda o: o.get("observationId", "")):
+        permitted, reason = gate_observation(target, usage_context)
+        if not permitted:
+            omitted.append({"observationId": target.get("observationId"),
+                            "reason": "; ".join(reason)})
+            continue
         if _rate(target) is None:
             omitted.append({"observationId": target.get("observationId"),
                             "reason": "unknown price or confirmed quantity"})
             continue
         accepted, reason = _valid(target, _day(shopping_date), _instant(as_of),
-                                  allowed_stores=allowed_stores)
+                                  allowed_stores=allowed_stores,
+                                  usage_context=usage_context)
         if not accepted:
             omitted.append({"observationId": target["observationId"],
                             "reason": "; ".join(reason)})
             continue
         results.append(compare_prices(target, observations, shopping_date, as_of=as_of,
-                                      coverage=coverage, allowed_stores=allowed_stores))
-    return {"shoppingDate": shopping_date, "comparisons": results,
-            "omittedTargets": omitted, "sideEffects": []}
+                                      coverage=coverage, allowed_stores=allowed_stores,
+                                      usage_context=usage_context))
+    output = {"shoppingDate": shopping_date, "comparisons": results,
+              "omittedTargets": omitted, "sideEffects": []}
+    if usage_context != "RESEARCH_ONLY":
+        gaps = sorted(set([f"{r['observationId']}: {r['reason']}" for r in omitted] +
+                          [gap for r in results for gap in r["gaps"]]))
+        output.update({"incomplete": bool(gaps), "gaps": gaps,
+                       "signals": [SIGNALS[2]] if gaps else []})
+    return output
