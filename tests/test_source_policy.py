@@ -295,6 +295,53 @@ class RetailerAndRightsGates(unittest.TestCase):
         self.assertFalse(source_gate(obs(), usage_context="APP_DISPLAY",
                                      rights_grants=misformed)[0])
 
+    def test_all_restricted_catalog_has_aggregate_grey_coverage(self):
+        # No comparison row exists, but rights filtering still loses coverage.
+        blocked = obs("BLOCKED", rights="RESTRICTED", price=73)
+        before = copy.deepcopy(blocked)
+        result = compare_catalog(
+            [blocked], DATE, as_of=NOW, coverage={"complete": True},
+            usage_context="APP_DISPLAY", rights_grants=grant())
+        self.assertEqual(result["comparisons"], [])
+        self.assertEqual(len(result["omittedTargets"]), 1)
+        self.assertTrue(result["incomplete"])
+        self.assertEqual(result["signals"], ["GREY_MAY_BE_CHEAPER"])
+        self.assertTrue(result["gaps"])
+        self.assertNotIn("73", str(result))
+        self.assertEqual(blocked, before)
+
+    def test_catalog_aggregate_coverage_propagates_child_rights_gap(self):
+        visible = obs("VISIBLE", price=200)
+        blocked = obs("BLOCKED", rights="UNVERIFIED", price=73)
+        result = compare_catalog(
+            [visible, blocked], DATE, as_of=NOW, coverage={"complete": True},
+            usage_context="APP_DISPLAY", rights_grants=grant())
+        self.assertEqual(len(result["comparisons"]), 1)
+        self.assertTrue(result["incomplete"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", result["signals"])
+        self.assertNotIn("73", str(result))
+
+    def test_historical_display_rejects_unverified_receipt_origin(self):
+        bought = obs("PURCHASED", price=200, kind="HISTORICAL_PAID")
+        bought["confirmed"] = True
+        bought["purchaseAt"] = NOW
+        alternative = obs("ALT", price=100, kind="LISTED_REGULAR")
+        options = dict(accessible_stores={"REWE": ["SHOP1"]},
+                       coverage={"complete": True},
+                       usage_context="APP_DISPLAY",
+                       rights_grants=grant(mode=PRICE_QUERY))
+        before = copy.deepcopy(bought)
+        rejected = evaluate_past_purchase(bought, [alternative], **options)
+        self.assertEqual(rejected["status"], "UNKNOWN")
+        self.assertIsNone(rejected["comparison"])
+        self.assertIn("receipt", rejected["reason"])
+        self.assertNotIn("100", str(rejected))
+        self.assertEqual(bought, before)
+        bought["source"]["evidenceKind"] = "USER_CONFIRMED_RECEIPT"
+        accepted = evaluate_past_purchase(bought, [alternative], **options)
+        self.assertEqual(
+            accepted["comparison"]["bestProvenMerchandiseSavingCents"], 100)
+
     def test_unknown_usage_context_is_rejected(self):
         with self.assertRaises(DomainError):
             source_gate(obs(), usage_context="NOT_A_CONTEXT")

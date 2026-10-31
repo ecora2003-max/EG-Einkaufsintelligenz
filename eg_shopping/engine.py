@@ -842,6 +842,14 @@ def evaluate_past_purchase(purchase: dict, historical_prices: list[dict], *,
     if purchase.get("confirmed") is not True or not purchase.get("purchaseAt"):
         return {"status": "UNKNOWN", "reason": "confirmed purchase timestamp missing",
                 "comparison": None}
+    if usage_context in ("APP_DISPLAY", "PRIVATE_USER_HISTORY"):
+        from .source_policy import source_gate
+        receipt_ok, receipt_reason = source_gate(
+            purchase, usage_context="PRIVATE_USER_HISTORY")
+        if not receipt_ok:
+            return {"status": "UNKNOWN",
+                    "reason": "confirmed private receipt evidence missing: " + receipt_reason,
+                    "comparison": None}
     when = _instant(purchase["purchaseAt"])
     if purchase.get("priceKind") != "HISTORICAL_PAID":
         raise DomainError("purchase must carry HISTORICAL_PAID priceKind")
@@ -932,5 +940,15 @@ def compare_catalog(observations: list[dict], shopping_date: str, *,
         results.append(compare_prices(target, observations, shopping_date, as_of=as_of,
                                       coverage=coverage, allowed_stores=allowed_stores,
                                       usage_context=usage_context, rights_grants=rights_grants))
+    # A catalog can have zero displayable targets after rights/scope filtering.
+    # Keep the coverage warning on the aggregate result, not only on individual
+    # comparisons (which would be absent in this case).
+    gaps = _coverage_gaps(coverage)
+    gaps.extend(f"{item.get('observationId')}: {item['reason']}" for item in omitted)
+    for comparison in results:
+        gaps.extend(comparison["gaps"])
+    gaps = sorted(set(gaps))
     return {"shoppingDate": shopping_date, "comparisons": results,
-            "omittedTargets": omitted, "sideEffects": []}
+            "omittedTargets": omitted, "incomplete": bool(gaps),
+            "gaps": gaps, "signals": [SIGNALS[2]] if gaps else [],
+            "sideEffects": []}
