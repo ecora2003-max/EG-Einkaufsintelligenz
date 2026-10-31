@@ -479,6 +479,58 @@ class InterestsAndHistory(unittest.TestCase):
             dict(p, confirmed=False), [old],
             accessible_stores={"LIDL": ["L123"]})["status"], "UNKNOWN")
 
+    def test_past_cheaper_unit_rate_does_not_prove_money_saved(self):
+        p = observation("P", 199, kind="HISTORICAL_PAID",
+                        at="2026-10-15T12:00:00+02:00",
+                        start=None, until=None)
+        p["purchaseAt"] = "2026-10-15T12:00:00+02:00"
+        p["confirmed"] = True
+        alt = observation("LARGE", 230, q=quantity(500, count=2),
+                          at="2026-10-14T09:00:00+02:00",
+                          start="2026-10-14", until="2026-10-16",
+                          retailer="REWE", store="R1")
+        r = evaluate_past_purchase(p, [alt], accessible_stores={"REWE": ["R1"]},
+                                   coverage={"complete": True})
+        self.assertEqual(r["status"], "NOT_PROVEN")
+        self.assertEqual(r["comparison"]["alternatives"], [])
+        self.assertEqual(r["comparison"]["signals"], [])
+        self.assertEqual(r["comparison"]["unitOnlyAlternatives"][0]["packsRequired"], 1)
+        self.assertEqual(r["comparison"]["unitOnlyAlternatives"][0]["historicalPurchaseCostCents"], 230)
+        self.assertIsNone(r["comparison"]["bestProvenMerchandiseSavingCents"])
+
+    def test_past_smaller_packs_are_rounded_to_actual_cash_saving(self):
+        p = observation("P", 199, kind="HISTORICAL_PAID",
+                        at="2026-10-15T12:00:00+02:00",
+                        start=None, until=None)
+        p["purchaseAt"] = "2026-10-15T12:00:00+02:00"
+        p["confirmed"] = True
+        alt = observation("SMALL", 90, q=quantity(250),
+                          at="2026-10-14T09:00:00+02:00",
+                          start="2026-10-14", until="2026-10-16",
+                          retailer="REWE", store="R1")
+        r = evaluate_past_purchase(p, [alt], accessible_stores={"REWE": ["R1"]},
+                                   coverage={"complete": True})
+        self.assertEqual(r["status"], "EVIDENCED_ALTERNATIVES")
+        row = r["comparison"]["alternatives"][0]
+        self.assertEqual(row["packsRequired"], 2)
+        self.assertEqual(row["historicalPurchaseCostCents"], 180)
+        self.assertEqual(row["historicalMerchandiseSavingsCents"], 19)
+        self.assertEqual(r["comparison"]["bestProvenMerchandiseSavingCents"], 19)
+
+    def test_past_unknown_deposit_is_not_cash_saving(self):
+        p = observation("P", 199, kind="HISTORICAL_PAID", deposit=None,
+                        at="2026-10-15T12:00:00+02:00")
+        p["purchaseAt"] = "2026-10-15T12:00:00+02:00"
+        p["confirmed"] = True
+        alt = observation("SMALL", 90, q=quantity(250),
+                          at="2026-10-14T09:00:00+02:00",
+                          start="2026-10-14", until="2026-10-16",
+                          retailer="REWE", store="R1")
+        r = evaluate_past_purchase(p, [alt], accessible_stores={"REWE": ["R1"]})
+        row = r["comparison"]["alternatives"][0]
+        self.assertEqual(row["historicalMerchandiseSavingsCents"], 19)
+        self.assertIsNone(row["historicalCheckoutSavingsCents"])
+
     def test_past_purchase_store_scope_must_be_proven(self):
         p = observation("P", 199, kind="HISTORICAL_PAID",
                         at="2026-10-15T12:00:00+02:00")
