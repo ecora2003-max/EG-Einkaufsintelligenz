@@ -1,6 +1,6 @@
 # Abnahmeprotokoll – Offline-Fachkern (31.10.2026)
 
-**Vertrag:** `EG-Architecture 1.0.0-draft`, zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`. Kein Produktions-/Händler-API-/Android-Test. **Letzter belegter Test:** GitHub Actions https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41221646056, PR-Merge `ebde5c7` gegen main `4593b195860432426c878d8535b969f05f779db7`, **82 bestanden / 0 fehlgeschlagen / 0 übersprungen**.
+**Vertrag:** `EG-Architecture 1.0.0-draft`, zuletzt gelesen `d22862739bd0e3ef8451ce029e54f7c33ee53e40`. Kein Produktions-/Händler-API-/Android-Test. **Letzter belegter Test:** GitHub Actions https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222789227, PR-Merge `571a9c7` gegen main `1373cac61f7ec8b41fe505044cdb2e4409df6974`, **92 bestanden / 0 fehlgeschlagen / 0 übersprungen**.
 
 ```bash
 python -m pip install 'jsonschema[format]==4.23.0'
@@ -37,3 +37,9 @@ Weitere nachgewiesene Tests: Acht-Händler-Katalog mit regulären Preisen, FEFO 
 Die Engine arbeitet offline auf standardisierten Daten-Snapshots. **Keine** API-Abdeckung, Live-Händlerverfügbarkeit, Nutzungsrechte fremder Webseiten, fehlerfreie Kamera-/Android-Migration oder globale Einkaufsrouten-Optimierung ist damit bewiesen. Eine reine Python-Referenz mit dokumentiertem Kotlin-Migrationspfad ist mit dem Architekturentwurf vereinbar; `INTEGRATED` darf nur Codex nach realer App-Integration und Prüfung setzen. Erweiterte Interessen-/Nachkauf-DTOs sind noch als Änderungsantrag dokumentiert, kein freigegebener neuer gemeinsamer Vertrag.
 
 **Zusätzlicher CLI-End-to-End-Nachweis:** `tests/test_cli.py` prüft das dokumentierte Input-JSON gegen einen echten `python -m eg_shopping`-Prozess, negative CLI-Fehler mit Exit 2 sowie seiteneffektfreie Bedarfsberechnung. Kotlin-Portspezifikation: `docs/KOTLIN_MIGRATION_SPEC.md`. Diese beiden Prüfungen ergänzen die 18 Pflichtszenarien, ersetzen keine Geräte-/App-Tests.
+
+## Nachprüfung der Quellen- und Einkaufsbeweiskette (31.10.2026)
+
+CI-Run [41222176171](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222176171) schlug zunächst mit **85 Tests, 2 Fehlern** fehl (ein bewusst widersprüchliches Datumsintervall und fehlende Rückgabe präziser Ablehnungsgründe). Nach Korrektur und ergänzender Prüfung: [41222463623](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222463623) **89/89 grün**; anschließend [41222789227](https://github.com/ecora2003-max/EG-Einkaufsintelligenz/actions/runs/41222789227) **92/92 grün**. Neue Regressionstests belegen: lokale Kalendertage Europe/Berlin, Rot plus Grau bei nur kettenweiter statt bestätigter Filialgültigkeit, Unbekannt-Scope und nach Entscheidungszeitpunkt beobachtete Preise, doppelte Beobachtungs-IDs, Auswahl belegter Preise vor fraglichen Quoten, Checkout-Budget inkl. Pfand, Varianten-/Bio-Konflikte, unbestätigte Coupons und mehrere Händlerangebote für **dieselbe** Produktidentität.
+
+**Kernbegrenzung:** Selbst vollständig grüne synthetische Tests bescheinigen keine Supermarkt-API-Vollständigkeit, rechtliche Quellenfreigabe, Echtzeitverfügbarkeit oder Android-Integration. Die Abnahme gilt nur für die offline ausführbare Referenzlogik.
