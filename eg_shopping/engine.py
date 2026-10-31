@@ -523,10 +523,16 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 continue
             _integer(product["priceCents"], "priceCents")
             pid = product["productId"]
-            if not isinstance(pid, str) or not pid or pid in product_by_id:
-                raise DomainError("missing or duplicated productId in purchase candidates")
-            product_by_id[pid] = product
+            if not isinstance(pid, str) or not pid:
+                raise DomainError("missing productId in purchase candidates")
             evidence = product.get("priceObservation")
+            # A product/SKU may have several competing retailer price snapshots.
+            # The observation ID distinguishes offers; it is not a new product.
+            candidate_id = (evidence.get("observationId") if isinstance(evidence, dict)
+                            else None) or pid
+            if candidate_id in product_by_id:
+                raise DomainError("duplicate price observation or ambiguous candidate identity")
+            product_by_id[candidate_id] = product
             problems = []
             if cutoff is None or not isinstance(evidence, dict):
                 problems.append("price observation/asOf UNKNOWN")
@@ -552,13 +558,13 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 problems.append("deposit/checkout cash UNKNOWN")
             else:
                 _integer(deposit, "depositCents")
-            source_issues[pid] = problems
+            source_issues[candidate_id] = problems
             # Optimization uses proven checkout cash (including refundable deposit)
             # for both ranking and budget feasibility. Merchandise cost is
             # independently reconstructed below from original products.
             cash_per_pack = product["priceCents"] + (deposit or 0)
             candidate = {
-                "productId": pid, "amount": q[0], "priceCents": cash_per_pack,
+                "productId": candidate_id, "amount": q[0], "priceCents": cash_per_pack,
                 "minPacks": product.get("minPacks", 1),
                 "maxPacks": product.get("maxPacks"),
                 "shelfLifeDays": product.get("shelfLifeDays"),
