@@ -55,3 +55,12 @@ Bei unbekanntem Rohbedarf enthält `project_needs` zusätzlich `unknownNeeds[]` 
 Installieren für Tests: `python -m pip install 'jsonschema[format]==4.23.0'` und `python -m unittest discover -s tests -v`. GitHub Actions prüft dieses Kommando bei Push/PR. Der formale Contract-Validator läuft gegen alle vorhandenen `contracts/v1/examples.json` und einen erzeugten `comparison.result`-Envelope.
 
 **Noch nicht integriert:** Kotlin-Produktivport, Room-Adapter, UI und Geräte-/Kühlkettenprüfung. Weitere konservative Einschränkungen, insbesondere Packungsoptimierung und bestätigte komplexe Couponbedingungen, sind in `docs/STATUS.md` notiert. Die Python-Referenz darf nicht als fertig integrierte Android-Funktion bezeichnet werden.
+
+
+## Belegte Preis-/Kaufkosten für Nachkaufvorschläge (31.10.2026)
+
+Der Port `suggest_purchases(..., as_of="2026-10-31T15:00:00+01:00")` akzeptiert pro internem Produkt-Snapshot zusätzlich ein originalgetreues `priceObservation` im Format von `contracts/v1/contract.schema.json` sowie `depositCents` als **bekannte ganze Centzahl oder null**. Eine rechnerische Packungsoptimierung ohne diese Angaben bleibt möglich, darf aber nur `REVIEW` liefern. Für eine als `FEASIBLE_NOT_PURCHASED` markierte Planrechnung muss die Preisbeobachtung zum Einkaufstag gültig, mit passender Ware/Mengenbasis/Preis verknüpft, qualitativ `CONFIRMED` oder `SOURCED` und spätestens zu `as_of` bekannt sein. Ketten-/Regionalscope erhält Warnhinweise statt Filialgarantie.
+
+`costCents` und `totalCostCents`: Warenpreise, ohne rückerstattbares Pfand. `checkoutCents` und `totalCheckoutCents`: beim Kauf zu zahlende bekannte Warenpreise **plus explizit belegtes Pfand**. Bei unbekanntem Pfand ist die Checkout-Summe `null`, nicht Warenpreis+0; dadurch auch `budgetRemainingCents=null`, weil die Liquidität nicht sicher berechnet werden kann. `knownCheckoutSubtotalCents` ist ausdrücklich nur die belegte Teilsumme. Shop-weite Versandkosten, Coupon-Kombinationen, einlösbare Rückgaben und Filialrouting sind nicht modelliert und werden nicht als optimiert dargestellt.
+
+Erforderliche minimal-normalisierte Produktdaten: `productId`, `foodTypeId`, `quantity`, `priceCents`, `priceObservation`, `depositCents`, `shelfLifeDays`, `storageClass`, `packageVolumeMl`; optional `minPacks` nur mit `termsVerified=true` aus verifizierten Promotionsbedingungen. Fehlt der Beleg, gibt die Engine `REVIEW` und eine dokumentierte Ursache zurück. Zusätzliche Präferenzfelder und Kombinationen ohne explizite Quellbasis gelten nicht automatisch als verbindliche Kaufentscheidung.
