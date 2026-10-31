@@ -33,6 +33,12 @@ def source_gate(obs: dict, *, usage_context: str = "RESEARCH_ONLY",
         return False, "invalid observation"
     scope = obs.get("scope") or {}
     src = obs.get("source") or {}
+    if usage_context == "PRIVATE_USER_HISTORY":
+        if (obs.get("priceKind") != "HISTORICAL_PAID" or
+            obs.get("confirmed") is not True or
+            src.get("evidenceKind") != "USER_CONFIRMED_RECEIPT"):
+            return False, "private history requires confirmed own historical receipt"
+        return True, "private history only, never current store price"
     retailer = scope.get("retailerId")
     mode = obs.get("acquisitionMode", src.get("acquisitionMode"))
     if mode is None:
@@ -51,12 +57,6 @@ def source_gate(obs: dict, *, usage_context: str = "RESEARCH_ONLY",
         return False, "retailer capability not verified"
     if usage_context == "RESEARCH_ONLY":
         return True, "synthetic/research evidence only; no display permission"
-    if usage_context == "PRIVATE_USER_HISTORY":
-        if (obs.get("priceKind") != "HISTORICAL_PAID" or
-            obs.get("confirmed") is not True or
-            src.get("evidenceKind") != "USER_CONFIRMED_RECEIPT"):
-            return False, "private history requires confirmed own historical receipt"
-        return True, "private history only, never current store price"
     if obs.get("priceKind") == "HISTORICAL_PAID":
         return False, "historical user receipt is not external current price"
     if src.get("rightsStatus") != "PERMITTED":
