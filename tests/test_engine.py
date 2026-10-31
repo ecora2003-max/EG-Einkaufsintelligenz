@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from eg_shopping import (DomainError, compare_prices, comparison_envelope,
+from eg_shopping import (DomainError, compare_catalog, compare_prices, comparison_envelope,
     evaluate_offer_interest, evaluate_past_purchase, list_offer_interests,
     project_needs, suggest_purchases)
 
@@ -195,6 +195,33 @@ class Comparisons(unittest.TestCase):
     def test_deterministic_independent_of_input_order(self):
         a, b = observation("A", 80), observation("B", 95)
         self.assertEqual(compare(self.target, a, b), compare(self.target, b, a))
+
+
+    def test_catalog_all_eight_and_regular(self):
+        retailers = ["LIDL", "ALDI_NORD", "ALDI_SUED", "REWE", "PENNY",
+                     "EDEKA", "NETTO_MD", "KAUFLAND"]
+        catalog = [observation(f"R{i}", 199-i*10, retailer=name) for i, name in enumerate(retailers)]
+        catalog.append(observation("REGULAR", 88, retailer="REWE",
+                                   kind="LISTED_REGULAR", start=None, until=None))
+        result = compare_catalog(catalog, DATE, as_of=NOW, coverage={"complete": False})
+        self.assertEqual(len(result["comparisons"]), 9)
+        self.assertFalse(result["omittedTargets"])
+        self.assertIn("GREY_MAY_BE_CHEAPER", result["comparisons"][0]["signals"])
+
+    def test_combined_capacity_not_reused_for_multiple_products(self):
+        view = {"totals": [
+            {"foodTypeId": "oats", "quantityToBuy": 500, "unit": "g", "basis": "NET"},
+            {"foodTypeId": "rice", "quantityToBuy": 500, "unit": "g", "basis": "NET"}],
+            "needs": [
+            {"foodTypeId": "oats", "quantityToBuy": 500, "dueDate": DATE},
+            {"foodTypeId": "rice", "quantityToBuy": 500, "dueDate": DATE}]}
+        ps = [{"productId": i.upper(), "foodTypeId": i, "quantity": quantity(500),
+               "priceCents": 100, "shelfLifeDays": 60, "storageClass": "DRY",
+               "packageVolumeMl": 800} for i in ("oats", "rice")]
+        b = {"amountCents": 250, "periodStart": DATE, "periodEnd": DATE}
+        out = suggest_purchases(view, ps, shopping_date=DATE, budget=b, capacity={"DRY": 1000})
+        self.assertEqual(out["items"][0]["status"], "FEASIBLE_NOT_PURCHASED")
+        self.assertIn("insufficient confirmed storage volume", out["items"][1]["reasons"])
 
     def test_schema_contract(self):
         try:
