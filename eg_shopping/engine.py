@@ -572,8 +572,9 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
                 verified_offers.append(candidate)
         if not offers:
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
-                         "reason": "no comparable priced pack", "costCents": None,
-                         "checkoutCents": None})
+                         "reason": "no comparable priced pack",
+                         "reasons": ["no comparable priced pack"],
+                         "costCents": None, "checkoutCents": None})
             issues.append("total cost UNKNOWN")
             checkout_complete = False
             continue
@@ -584,10 +585,14 @@ def suggest_purchases(needs_view: dict, products: list[dict], *,
         except PackSearchError as ex:
             raise DomainError(str(ex)) from ex
         if plan["costCents"] is None:
+            rejection_reasons = [x["reason"] for x in plan["rejected"]]
+            rejection_reasons += [reason for problems in source_issues.values()
+                                  for reason in problems]
             rows.append({"foodTypeId": need["foodTypeId"], "status": "REVIEW",
                          "reason": plan["status"], "costCents": None,
-                         "checkoutCents": None, "warnings": plan["warnings"],
-                         "rejected": plan["rejected"]})
+                         "checkoutCents": None,
+                         "reasons": sorted(set(plan["warnings"] + rejection_reasons)),
+                         "warnings": plan["warnings"], "rejected": plan["rejected"]})
             issues.append("total cost UNKNOWN")
             checkout_complete = False
             continue
