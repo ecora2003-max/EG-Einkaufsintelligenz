@@ -110,17 +110,11 @@ def need_projection_envelope(projection: dict, *, horizon_days: int,
         due = _day(due_str)
         if not origin_day <= due < bound:
             continue
-        used_ids.add(eid)
-        needs.append({
-            "needId": eid, "foodTypeId": _identifier(food, "foodTypeId"),
-            "dueDate": due_str,
-            "quantity": {"amount": None, "unit": "g", "basis": "UNKNOWN",
-                         "confirmed": False},
-            "stockEvidenceRefs": [], "planRefs": [eid],
-            "completeness": "UNKNOWN",
-            "warnings": [unknown.get("reason") or "quantity UNKNOWN",
-                         "quantity.unit unresolved; g is schema placeholder only"]})
-        warnings.append(f"unknown demand {eid}: quantity and unit unresolved")
+        # Schema v1.1 requires a known unit even when quantity is null. The
+        # source snapshot provides neither. Do not fabricate a unit: surface
+        # unresolved demand at envelope level until architecture can add
+        # nullable unit/basis or a separate unknown-needs collection.
+        warnings.append(f"unknown demand {eid}: quantity/unit unresolved; excluded from typed needs")
     needs.sort(key=lambda row: (row["dueDate"], row["needId"]))
     complete = projection.get("snapshotComplete") is True and not warnings
     payload = {"snapshotAt": snapshot_at, "asOf": as_of,
