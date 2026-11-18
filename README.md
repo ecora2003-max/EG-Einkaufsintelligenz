@@ -1,5 +1,7 @@
 # EG-Einkaufsintelligenz
 
+> **Status 18.11.2026 – REFERENZ/ARCHIV.** Eigenständige Modul-Chat-Steuerung abgelöst durch [Ernaerungsgedaechnis](https://github.com/ecora2003-max/Ernaerungsgedaechnis) mit den vier aktiven Dokumenten `AGENTS.md`, `docs/NOW.md`, `docs/REQUIREMENTS.md` und `docs/ACCEPTANCE.md`. Fachcode/Vertragstests und historische Modulberichte bleiben erhalten; weitere Arbeit hier nur bei konkretem Auftrag.
+
 > **Verbindliche Einweisung für den zuständigen Entwicklungs-Chat:** [AGENTS.md](AGENTS.md) · [Entwicklungsauftrag](docs/DEVELOPMENT_MANDATE.md) · [Abnahmetests und Fertigstellung](docs/ACCEPTANCE.md) · [Integrationsschnittstellen](docs/INTEGRATION.md) · [Status](docs/STATUS.md). Gemeinsame Verträge: [EG-Architecture](https://github.com/ecora2003-max/EG-Architecture). **Nur dieses Modulrepo bearbeiten; Architektur und private Haupt-App ausschließlich lesen. Tests nach jeder fachlichen Änderung verpflichtend.**
 
 ## Auftrag
